@@ -77,10 +77,10 @@ table {
     border-radius: 8px; 
 }
 
-.diagnosticButton {display: inline-block;
+.diagButton {display: inline-block;
 	background-color: #ff6600;
-    width: 200px;
-    height: 30px;
+    width: 160px;
+    height: 20px;
     margin: 0px;
     border: 2px solid #ff00ff;  
     border-radius: 8px; 
