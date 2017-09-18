@@ -1,0 +1,59 @@
+autotester setup guide
+
+This leads you through the steps to install the AutoTester software on a Raspberry Pi.  The installation steps assume
+a headless install (meaning you don't need to connect the Raspberry Pi to a monitor).
+
+Step 1. Download a fresh image of Raspian Stretch Lite from here: https://www.raspberrypi.org/downloads/raspbian/
+
+Step 2. Install it onto a microSD card (8GB should be sufficient) according to the instructions here: https://www.raspberrypi.org/documentation/installation/installing-images/README.md
+
+Step 3. Once the Raspian image has been written onto the SD card, you need to set it up so it can be accessed externally.
+For this you need to do two things: enable ssh so you can control it remotely, and enable wifi (unless you prefer ethernet)
+a. To enable ssh, create an empty file named "ssh" (no extension) on the boot directory.  The boot directory is the one that Windows sees.
+b. Enable wifi according to these instructions: sudo 
+
+Step 4. Insert the microSD card into the Raspberry Pi and power it up.  Since it will allocate its ip address using DHCP, you may have to
+search to find the new device.  Once you have identified it, you can SSH to it and start the configuration process.  There are various
+SSH programs available.  For windows the most common program is PuTTY.  Using the Raspberry Pi's IP address, connect to the Raspberry Pi.
+The default username is "pi" and the password is "raspberry".
+
+Step 5. You may want to set a static IP address for the wlan.  To do so, edit /etc/dhcpcd.conf  (sudo nano /etc/dhcpcd.conf).  Add the following lines to the bottom of the file and save it (change YOUR_IP_ADDR to your value):
+interface wlan0
+static ip_address=192.168.1.YOUR_IP_ADDR/24
+static routers=192.168.1.1
+static domain_name_servers=192.168.1.1
+
+You can reboot and connect to the static IP address:
+
+Step 6. Use the raspi-config program to set up options (sudo raspi-config).  These include:
+ - Changing the User Password (Menu item 1)
+ - Changing the Hostname to something descriptive (Menu item 2)
+ - Changing the Timezone to the correct one (Menu item 4)
+ - Enabling the Pi Camera (Menu item 5)
+ - Expanding the File System (Menu item 7)
+Reboot afterwards
+
+Step 7. One of the biggest dependencies we have is the computer vision library OpenCV.  Unfortuantely, 
+appropriate versions of the libraries are not available, so we need to compile it.  
+The steps to do this are here: http://www.pyimagesearch.com/2017/09/04/raspbian-stretch-install-opencv-3-python-on-your-raspberry-pi/
+Start with step #2 of the guide and setup the virtual environment using Python3.  Name the virtual environment "cv" as in the guide.
+This is the longest step of the install process.  Note that in setting up the virtual environment where you append the virtualenv path
+to the ~/.profile file, I needed to add the line: "export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3" before "source /usr/local/bin/virtualenvwrapper.sh".
+
+Step 8. We need to install more computer vision and machine learning libraries.  These are simpler, but also take a long time to install.
+Make sure you are within the cv virtual environment when running these steps.
+sudo apt-get install libboost-all-dev -y
+sudo pip install dlib
+sudo pip install scikit-learn -v
+
+Step 9. Let's start installing dependencies.  The first set is for django which is the web framework
+sudo pip install django
+
+
+
+
+
+
+ 
+
+

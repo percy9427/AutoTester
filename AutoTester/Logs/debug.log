@@ -1,0 +1,8 @@
+2017-09-17 23:19:08,248 - MainThread - Thread: Run Test started
+2017-09-17 23:19:08,268 - MainThread - Thread: Job Scheduler started
+2017-09-17 23:19:08,269 - MainThread - Tester Server version 0.01 loaded
+2017-09-17 23:19:08,270 - Job Scheduler - Days to run for ph-API was 2day
+2017-09-17 23:19:08,275 - Job Scheduler - Days to run for Nitrite-API was Never
+2017-09-17 23:19:08,277 - Job Scheduler - Days to run for Ammonia-API was Never
+2017-09-17 23:19:08,278 - Job Scheduler - Days to run for phHigh-API was Tuesday
+2017-09-17 23:19:08,281 - Job Scheduler - Days to run for Nitrate-API was Never

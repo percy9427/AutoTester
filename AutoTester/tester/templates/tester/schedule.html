@@ -1,0 +1,18 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<form action="/tester/schedule/" method="post" id="queueTest">
+	{% csrf_token %}
+	{{schedFormSet.management_form}}
+	<table>
+		{% for schedForm in schedFormSet %}
+			<table id="schedEntry">
+			<tr>-----------------------------------------------</tr>
+			{{schedForm.as_table}}
+			</table>
+		{% endfor %}
+	</table>
+	<input class="genericButton" type="submit" title="Save the changes" name="actionButton" value="UPDATE">
+	<input class="cancelButton"type="submit" title="Abandon the changes" name="actionButton" value="CANCEL">
+</form>
+{% endblock %}

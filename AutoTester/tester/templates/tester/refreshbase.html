@@ -1,0 +1,13 @@
+{% load static %}
+<html>
+	<head><meta http-equiv='refresh' content='5; URL="/"'/>
+		<title>AutoTester {{pageName}}</title>
+		<link rel="stylesheet" type="text/css" href="{% static 'tester/style.css' %}" />
+	<body>
+		<h1>AutoTester {{pageName}}</h1>
+		{% include 'tester/navigate.html' %}
+		{% include 'tester/messages.html' %}
+		{% block content %}
+		{% endblock %}
+	</body>
+</html>

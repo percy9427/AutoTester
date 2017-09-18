@@ -1,0 +1,26 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<form action="/tester/logs/" method="post" id="logDisplay">
+{% csrf_token %}
+<table>
+<tr>
+<td>Select Log to Display:</td>
+{% if logToDisplay == "Debug" %}
+	<td><input type="radio" name="radioLogDisplay" title="Display debug log" class="radioLogDisplay" checked="checked" value="Debug"><label>Debug</label></td>
+	<td><input type="radio" name="radioLogDisplay" title="Display info log" class="radioLogDisplay" value="Info"><label>Info</label></td>
+{% else %}
+	<td><input type="radio" name="radioLogDisplay" title="Display debug log" class="radioLogDisplay" value="Debug"><label>Debug</label></td>
+	<td><input type="radio" name="radioLogDisplay" title="Display info log" class="radioLogDisplay" checked="checked" value="Info"><label>Info</label></td>
+{% endif %}
+<td><input type="submit" class="genericButton" title="Display the selected Log" name="displayLog" value="Display"></td>
+</tr>
+</table>
+<div class="scrollLogBox">
+<pre>
+{{scrollLog}}
+</pre>
+</div>
+
+{% endblock %}
+	

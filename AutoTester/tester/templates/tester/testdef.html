@@ -1,0 +1,27 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<form action="/tester/testdef/" method="post" id="queueTest">
+{% csrf_token %}
+{% if testToChange %}
+	<input type="hidden" name="originalTestName" value="{{originalTestName}}">	
+	<table>
+		{{testDef.as_table}}
+	</table>
+	<input type="submit" class="genericButton" name="testAction" value="Save">
+	<input type="submit" class="cancelButton" name="testAction" value="Cancel">
+{% else %}
+	{% if testDefList %}
+	<table>
+		{% for test in testDefList %}
+		<tr>
+		<td><input type="submit" name="testListAction" class="testEditButton" id="testEdit" value="EDIT {{test.testName}}"></td>			
+		<td><input type="submit" name="testListAction" class="testDeleteButton" id="testDel" value="DELETE {{test.testName}}"></td>
+		</tr>			
+		{% endfor %}
+	</table>
+	{% endif %}			
+	<input type="submit" name="testAction" class="testCreateButton" value="CREATE NEW">
+{% endif %}
+</form>
+{% endblock %}

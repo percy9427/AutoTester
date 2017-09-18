@@ -1,0 +1,18 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<form action="/tester/reagent/" method="post" id="queueTest">
+	{% csrf_token %}
+	{{reagFormSet.management_form}}
+	<table>
+		{% for reagForm in reagFormSet %}
+			<table id="reagEntry">
+			<tr>-----------------------------------------------</tr>
+			{{reagForm.as_table}}
+			</table>
+		{% endfor %}
+	</table>
+	<input type="submit" class="genericButton" name="actionButton" value="UPDATE">
+	<input type="submit" class="cancelButton" name="actionButton" value="CANCEL">
+</form>
+{% endblock %}

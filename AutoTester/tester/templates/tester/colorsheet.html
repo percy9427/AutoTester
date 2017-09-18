@@ -1,0 +1,50 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+{% load static %}
+{% if colorSheetImage %}
+{% else %}
+<img src='http://{{streamingURL}}/tester.mjpg'  title="Live feed from inside the autotester">
+{% endif %}
+{% if colorSheetList %}
+<form action="/tester/colorsheet/" method="post" id="queueTest">
+{% csrf_token %}
+ColorSheet Action:<br>
+	{% for cs in colorSheetList %}
+		{% if cs.colorSheetName == colorSheetToUse %}
+			<input type="radio" name="csToUse" title="Select ColorSheet to edit" checked = 'checked' value="{{cs.colorSheetName}}"><label>{{cs.colorSheetName}}</label>
+		{% else %}
+			<input type="radio" name="csToUse" title="Select ColorSheet to edit" value="{{cs.colorSheetName}}"><label>{{cs.colorSheetName}}</label>			
+		{% endif %}
+	{% endfor %}
+	<br>
+	<input type="submit" title="View the selected colorsheet" name="csAction" value="VIEW">
+	<input type="submit" title="Edit the selected colorsheet" name="csAction" value="EDIT">
+	<input type="submit" title="Delete the selected colorsheet" name="csAction" value="DELETE">
+	<input type="submit" title="Create a new colorsheet with the specified name" name="csAction" value="NEW">
+	<input type="submit" title="Rename the specified colorsheet to the new name" name="csAction" value="RENAME AS">
+	<input type="text" name="newName" title="Name of the new or renamed the colorsheet" value="New Name">
+</form>
+{% endif %}
+
+{% if colorSheetImage %}
+<form action="/tester/colorsheet/" method="post" id="queueTest">
+{% csrf_token %}
+<div class="clickImage">
+<table>
+<tr>
+<td class="colorsheetnamedisplay">ColorSheet being Edited :<input type="text" name="csToUse" value="{{colorSheetToUse}}" readonly="readonly" title="Colorsheet currently being edited"></td></tr>
+<tr><td>Instructions: To add a new Swatch: Enter the value and single click that swatch in the image.<br>
+To reassign an existing swatch, enter an existing value and single click on that swatch in the image.<br>
+To delete a swatch, single click on the swatch within the color table<br>
+Click Done when finished setting up all the swatches</td></tr>
+<tr><td class="valuetoassign">Value to Assign to Swatch:<input type="text" name="swatchValue" value="0" title="Value to assign to the swatch"></td></tr>
+<tr><td><input type="image" id="testerImage" src="{% static 'tester/' %}{{colorSheetImage}}" width="{{imageWidth}}"  height="{{imageHeight}}"  title="Click on image to update colorsheet"></td></tr>
+<tr><td><input class="genericButton" type="submit" name="swatchAction" title="All done editing this colorsheet" value="Done"></td></tr>
+</div>
+</table>
+</form>
+{% endif %}
+{% endblock %}
+
+	

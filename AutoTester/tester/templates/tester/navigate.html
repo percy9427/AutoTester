@@ -1,0 +1,23 @@
+{% load static %}
+<div class="navigation">
+<table>
+<tr>
+<td>
+<div class="navButton"><form action="/tester/" method="get"><button type="submit"  title="Jump to Home Status Screen" class="navigate" value="control">Home</button></form></div>
+<div class="navButton"><form action="/tester/history/" method="get"><button type="submit"  title="Jump to Test Results Screen" class="navigate" value="history">History</button></form></div>
+<div class="navButton"><form action="/tester/schedule/" method="get"><button type="submit"  title="Jump to Test Scheduler Screen" class="navigate" value="schedule">Schedule</button></form></div>
+<div class="navButton"><form action="/tester/testdef/" method="get"><button type="submit"  title="Jump to Test Setup Screen" class="navigate" value="testSetup">Test Setup</button></form></div>
+<div class="navButton"><form action="/tester/reagent/" method="get"><button type="submit"  title="Jump to Reagent Setup Screen" class="navigate" value="reagent">Reagents</button></form></div>
+<div class="navButton"><form action="/tester/control/" method="get"><button type="submit"  title="Jump to Detailed Control Screen" class="navigate" value="control">Control</button></form></div>
+<div class="navButton"><form action="/tester/train/" method="get"><button type="submit"  title="Jump to Training Screen" class="navigate" value="train">Train</button></form></div>
+<div class="navButton"><form action="/tester/colorsheet/" method="get"><button type="submit"  title="Jump to ColorSheet Setup Screen" class="navigate" value="colorsheet">ColorSheet</button></form></div>
+<div class="navButton"><form action="/tester/logs/" method="get"><button type="submit"  title="Jump to Log Display Screen" class="navigate" value="logs">Logs</button></form></div>
+<div class="navButton"><form action="/tester/admin/" method="get"><button type="submit"  title="Jump to Administrative Setup Screen" class="navigate" value="admin">Admin</button></form></div>
+</td>
+<td>
+<a href="https://RoboGardens.com">
+<img border="0" alt="RoboGardens Logo" src="{% static 'tester/robogardenssquare.png' %}" width="100" height="100" title="RoboGardens - Automation That Works" >
+</td>
+</tr>
+</table>
+</div>

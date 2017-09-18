@@ -1,0 +1,24 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<div class="adminTable">
+<form action="/tester/admin/" method="post" id="adminSetup">
+{% csrf_token %}
+<table>
+<tr><td>AutoTester Configuration:</td></tr>
+{% if testerAdminForm %}
+	{{testerAdminForm.as_table}}
+{% endif %}
+</table>
+	<input type="submit" class="genericButton" title="Generates an IFTTT test message to ensure the key works" name="actionButton" value="Test IFTTT">
+	<input type="submit" class="genericButton" title="Updates the tester configuration" name="actionButton" value="UPDATE">
+	<input type="submit" class="cancelButton" title="Cancels any changes" name="actionButton" value="CANCEL">
+</form>
+</div>
+<br>
+<form action="/admin/login/" method="get" id="userAdmin">
+	{% csrf_token %}
+	<button type="submit" form="userAdmin" title="User Administration including Logging out and password change" name="manageUsers" class="genericButton" value="manageUsers" />Manage Users</button>
+</form>
+{% endblock %}
+	

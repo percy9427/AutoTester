@@ -1,0 +1,179 @@
+table {
+    color: green;
+}
+#REMOVE-Status {background-color: aquamarine; }
+#CANCEL-Status {background-color: coral; }
+#DELETE-Status {background-color: gainsboro; }
+.navButton { display: inline-block;
+}
+.navigate {background-color: mediumorchid;
+    width: 90px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #73AD21; 
+    border-radius: 8px; 
+}
+
+.queueButton {display: inline-block;
+	background-color: aqua;
+    width: 120px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.genericButton {
+	background-color: aqua;
+    width: 120px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.cancelButton {
+	background-color: #ff6600;
+    width: 120px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.testEditButton {display: inline-block;
+	background-color: #ffcc00;
+    width: 180px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #663300;  
+    border-radius: 8px; 
+}
+
+.testDeleteButton {display: inline-block;
+	background-color: #ff6600;
+    width: 180px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #663300;  
+    border-radius: 8px; 
+}
+
+.testCreateButton {display: inline-block;
+	background-color: aqua;
+    width: 365px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.controlButton {display: inline-block;
+	background-color: aqua;
+    width: 100px;
+    height: 20px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.diagnosticButton {display: inline-block;
+	background-color: #ff6600;
+    width: 200px;
+    height: 30px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.controlTable {
+	background-color: #ffffcc;
+    border: 2px solid #73AD21;  
+}
+
+.trainButton {display: inline-block;
+	background-color: aqua;
+    width: 100px;
+    height: 20px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.directionButton {display: inline-block;
+	background-color: #ff6600;
+    width: 100px;
+    height: 20px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
+.trainTable {
+	background-color: #ffffcc;
+    border: 2px solid #73AD21;  
+}
+
+.queueTable {
+	background-color: #ffffcc;
+    border: 2px solid #ff00ff;  
+}
+
+.adminTable {
+	background-color: #ffffcc;
+    border: 2px solid #ff00ff;  
+}
+
+.resultsTable {
+	background-color: #ffffcc;
+    border: 2px solid #ff00ff;  
+}
+
+.radioTestToDisplay {display: inline-block;
+	background-color: aqua;
+}
+
+.scrollLogBox {
+	background-color: #ffffcc;
+    border: 2px solid #ff00ff;  
+}
+
+.alert-error {
+	background-color: #ff0000;
+    border: 2px solid #ff00ff;  
+}
+
+.alert-warning {
+	background-color: #00ffff;
+    border: 2px solid #ff00ff;  
+}
+
+.alert-success {
+	background-color: #00ff00;
+    border: 2px solid #ff00ff;  
+}
+
+.alert-info {
+	background-color: #cccccc;
+    border: 2px solid #ff00ff;  
+}
+
+.alert-debug {
+	background-color: #999999;
+    border: 2px solid #ff00ff;  
+}
+
+.colorsheetnamedisplay {color: mediumorchid;
+}
+
+.valuetoassign {color: #ff0000;
+}
+
+
+#navigationLabel {color: mediumorchid;
+}
+
+#borderMoveUL {background-color: yellow; }
+#borderMoveLR {background-color: yellow; }
+#centerMove {background-color: yellow; }
+#groupMove {background-color: yellow; }

@@ -1,0 +1,35 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<form action="/tester/history/" method="post" id="queueTest">
+{% csrf_token %}
+Test To View<br>
+{% if testList %}
+	{% for test in testList %}
+		{% if test.testName == currentlySelected %}
+			<input type="radio" name="toDisplay" title="Select test for displaying results" class="radioTestToDisplay" checked = 'checked' value="{{test.testName}}"><label>{{test.testName}}</label>
+		{% else %}
+			<input type="radio" name="toDisplay" title="Select test for displaying results" class="radioTestToDisplay" value="{{test.testName}}"><label>{{test.testName}}</label>			
+		{% endif %}
+	{% endfor %}
+	{% if "All" == currentlySelected %}
+		<input type="radio" name="toDisplay" title="Select results for all tests" class="radioTestToDisplay" checked = 'checked' value="All"><label>All</label>
+	{% else %}
+		<input type="radio" name="toDisplay" title="Select results for all tests" class="radioTestToDisplay" value="All"><label>All</label>			
+	{% endif %}
+	<input class="genericButton" type="submit" title="Display results of past tests" name="display" value="Display">
+{% endif %}
+<table class="resultsTable">
+	<tr><td>Test</td><td>Results</td><td>Status</td><td>Timestamp</td></tr><tr>
+	{% for result in resultsList %}
+		<td title="Test that was run">{{result.testPerformed}}</td>
+		<td title="Results from the test">{{result.results}}</td>
+		<td title="Completion status">{{result.status}}</td>
+		<td title="When the test was run">{{result.datetimePerformed}}</td>
+		</tr>
+	{% endfor %}
+</table>
+</form>
+{% endblock %}
+
+	

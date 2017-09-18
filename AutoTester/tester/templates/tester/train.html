@@ -1,0 +1,89 @@
+{% extends 'tester/base.html' %}
+
+{% block content %}
+<img src='http://{{streamingURL}}/tester.mjpg' title="Live feed from inside the autotester">
+<form action="/tester/train/" method="post" id="queueTest">
+{% csrf_token %}
+<table>
+<tr>
+<td>Select Step Size:</td>
+{% for step in stepSizeList %}
+	{% if step == lastStepSize %}
+		<td><input type="radio" name="stepSize" title="Select step size for operations below" checked="checked" value="{{step}}"><label>{{step}}</label></td>
+	{% else %}
+		<td><input type="radio" name="stepSize" title="Select step size for operations below" value="{{step}}"><label>{{step}}</label></td>
+	{% endif %}
+{% endfor %}
+<td> (pixels or degrees or mm)</td>
+</tr>
+</table>
+<table border="1" class="trainTable">
+<tr>
+<td></td>
+<td><input type='submit' class="directionButton" title="shifts upper left corner of feature clipping rectangle UP by step size" name='button' value='UL-Up'\' ALIGN=\'Middle Top\' ></td>
+<td></td><td></td><td></td>
+<td><input type='submit' class="trainButton" title='Moves plunger UP by selected step size (in mm)' name='button' value='PlungerUp'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title="Opens the reagent stoppers" name='button' value='OpenStoppers'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title="Retrain the autotester on the feature images" name='button' value='Learn'\' ALIGN=\'Middle Top\' ></td>
+</tr><tr>
+<td><input type='submit' class="directionButton" title="shifts upper left corner of feature clipping rectangle LEFT by step size" name='button' value='UL-L'\' ALIGN=\'Middle Top\' ></td>
+<td></td>
+<td><input type='submit' class="directionButton" title="shifts upper left corner of feature clipping rectangle RIGHT by step size" name='button' value='UL-R'\' ALIGN=\'Middle Top\' ></td>
+<td></td>
+<td></td>
+<td><input type='submit' class="trainButton" title='moves plunger DOWN by selected step size (in mm)' name='button' value='PlungerDn'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title="Closes the reagent stoppers" name='button' value='CloseStoppers'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title="Test categorization of the current image" name='button' value='Test'\' ALIGN=\'Middle Top\' ></td>
+</tr><tr>
+<td></td>
+<td><input type='submit' class="directionButton" title="shifts upper left corner of feature clipping rectangle DOWN by step size" name='button' value='UL-Dn'\' ALIGN=\'Middle Top\' ></td>
+<td></td><td></td><td></td>
+<td><input type='submit' class="trainButton" title='Rotate Clockwise by selected step size (degrees)' name='button' value='CarouselCW'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title='Center the reagent automatically' name='button' value='Center'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title='Rotate CounterClockwise by selected step size (degrees)' name='button' value='CarouselCCW'\' ALIGN=\'Middle Top\' ></td>
+</tr><tr>
+</tr><tr>
+</tr><tr>
+<td><input type='submit' class="trainButton" title='Multiple training images will be captured with a random shift to add training variability' name='button' value='JiggleOn'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title='Single training images will be captured with no random shift' name='button' value='JiggleOff'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title='The autotester will generate a series of training images' name='button' value='GenSeries'\' ALIGN=\'Middle Top\' ></td>
+<td></td><td></td><td></td>
+<td><input type='submit' class="directionButton" title="shifts lower right corner of feature clipping rectangle UP by step size" name='button' value='LR-Up'\' ALIGN=\'Middle Top\' ></td>
+<td></td>
+</tr><tr>
+<td><input type='submit' class="trainButton" title="Displayed image is uncompensated (used by some features)" name='button' value='Raw'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title="Fisheye distortion is removed from displayed image" name='button' value='Undistort'\' ALIGN=\'Middle Top\' ></td>
+<td></td>
+<td></td><td></td>
+<td><input type='submit' class="directionButton" title="shifts lower right corner of feature clipping rectangle LEFT by step size" name='button' value='LR-L'\' ALIGN=\'Middle Top\' ></td>
+<td></td>
+<td><input type='submit' class="directionButton" title="shifts lower right corner of feature clipping rectangle RIGHT by step size" name='button' value='LR-R'\' ALIGN=\'Middle Top\' ></td>
+</tr><tr>
+<td><input type='submit' class="trainButton" title="Saves the coordinates of the feature clipping box" name='button' value='SaveBox'\' ALIGN=\'Middle Top\' ></td>
+<td><input type='submit' class="trainButton" title="Saves a snapshot of the current feature within the clipping box" name='button' value='SnapFeat'\' ALIGN=\'Middle Top\' ></td>
+<td></td><td></td><td></td><td></td>
+<td><input type='submit' class="directionButton" title="shifts lower right corner of feature clipping rectangle DOWN by step size" name='button' value='LR-Dn'\' ALIGN=\'Middle Top\' ></td>
+<td></td>
+</tr>
+</table>
+{% if featureList %}
+<div>
+<table>
+<tr><td>Feature to Train:</td>
+<td><input type='submit' class="trainButton" title="Activates the feature to be worked on" name='button' value='LoadFeat'\' ALIGN=\'Middle Top\' ></td>
+</tr>
+<tr>
+	{% for feature in featureList %}
+		{% if feature.featureName == currentlySelected %}
+			<td><input type="radio" name="toTrain" title="Select feature to edit or train" checked = 'checked' value="{{feature.featureName}}"><label>{{feature.featureName}}</label></td>
+		{% else %}
+			<td><input type="radio" name="toTrain" title="Select feature to edit or train" value="{{feature.featureName}}"><label>{{feature.featureName}}</label></td>			
+		{% endif %}
+	{% endfor %}
+</tr>
+</table>
+</div>
+{% endif %}
+</form>
+{% endblock %}
+	
