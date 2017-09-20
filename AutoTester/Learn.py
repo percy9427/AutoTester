@@ -1,7 +1,14 @@
 '''
-Created on Jul 28, 2017
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
 
-@author: eussrh
+This module implements feature training and testing functions
+
+@author: Stephen Hayes
 '''
 from skimage.feature import hog
 from sklearn import svm
@@ -267,17 +274,17 @@ def insertTrainingGraphic(tester,image):
         #This inserts a training overlay into the video stream
         font = cv2.FONT_HERSHEY_SIMPLEX        
         cv2.rectangle(image,(tester.featureWindowULCol,tester.featureWindowULRow),(tester.featureWindowLRCol,tester.featureWindowLRRow),(255,255,255),2)
-        cv2.putText(image,'Clipping: ' + tester.currentFeature.featureName,(20,20), font, .75,(255,255,255),2,cv2.LINE_AA)
-        cv2.putText(image,'Current Step Size: ' + str(tester.featureStepSize),(20,50), font, .75,(255,255,255),2,cv2.LINE_AA)
+        cv2.putText(image,'Feature: ' + tester.currentFeature.featureName,(20,55), font, .75,(255,255,255),2,cv2.LINE_AA)
+        cv2.putText(image,'Current Step Size: ' + str(tester.featureStepSize),(20,85), font, .75,(255,255,255),2,cv2.LINE_AA)
         cv2.putText(image,'(' + str(tester.featureWindowULCol) + ',' + str(tester.featureWindowULRow) + ')',(tester.featureWindowULCol,tester.featureWindowULRow-20), font, .75,(255,255,255),2,cv2.LINE_AA)
         cv2.putText(image,'(' + str(tester.featureWindowLRCol) + ',' + str(tester.featureWindowLRRow) + ')',(tester.featureWindowLRCol-110,tester.featureWindowLRRow+30), font, .75,(255,255,255),2,cv2.LINE_AA)
         if not tester.currentFeature is None:
             if tester.currentFeature.useDlib:
                 if tester.currentFeature.boundingBoxList is None:
-                    cv2.putText(image,"None",(20,80), font, .75,(255,255,255),2,cv2.LINE_AA)                                
+                    cv2.putText(image,"None",(20,115), font, .75,(255,255,255),2,cv2.LINE_AA)                                
                 else:
                     if len(tester.currentFeature.boundingBoxList)==0:    
-                        cv2.putText(image,"None",(20,80), font, .75,(255,255,255),2,cv2.LINE_AA) 
+                        cv2.putText(image,"None",(20,115), font, .75,(255,255,255),2,cv2.LINE_AA) 
                     else:                               
                         for box in tester.currentFeature.boundingBoxList:
                             boxULCol=int(round(box[0]+tester.featureWindowULCol))
@@ -286,7 +293,7 @@ def insertTrainingGraphic(tester,image):
                             print('Col Shift: ' + str(box[0]*tester.currentFeature.positionCoefficientA+tester.currentFeature.positionCoefficientB) + ', Row Shift: ' + str(box[1]*tester.currentFeature.positionCoefficientA+tester.currentFeature.positionCoefficientB))
             else:
                 if not tester.currentFeature.lastVisualState is None:
-                    cv2.putText(image,tester.currentFeature.lastVisualState,(20,80), font, .75,(255,255,255),2,cv2.LINE_AA)                                
+                    cv2.putText(image,tester.currentFeature.lastVisualState,(20,115), font, .75,(255,255,255),2,cv2.LINE_AA)                                
     except:
         traceback.print_exc()
 

@@ -1,3 +1,16 @@
+'''
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
+
+This module configures the autotester database models for django.
+
+@author: Stephen Hayes
+'''
+
 from django.db import models
 from datetime import datetime
 from django.forms import ModelForm
@@ -7,6 +20,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 class TesterExternal(models.Model):
     testerName = models.CharField(max_length=200, default='AutoTester')
     testerVersion = models.CharField(max_length=40, default='v1.0')
+    dbModelVersion = models.CharField(max_length=40, default='v1.0')
+    virtualEnvironmentName = models.CharField(max_length=40, default='cv')
     lensType = models.CharField(max_length=40, default='piCam-FE')
     fisheyeExpansionFactor = models.FloatField(default=1.2)
     cameraWidthLowRes = models.IntegerField(default=480)
@@ -97,14 +112,18 @@ class TestDefinition(models.Model):
     enableTest = models.BooleanField(default=True)
     waterVolInML = models.FloatField(default=5.0, validators=[MinValueValidator(1),MaxValueValidator(12),])
     reagent1Slot = models.ForeignKey(ReagentSetup, related_name="reagent1", on_delete=models.CASCADE, null=True)
+    MEASUREMENT_CHOICES = (('drops', 'drops'), ('ml', 'ml'))
+    reagent1DispenseType=models.CharField(max_length=6, choices=MEASUREMENT_CHOICES, default='drops', help_text="How to measure dispensing")
+    reagent1DispenseCount = models.FloatField(default=0, null=True, validators=[MinValueValidator(.05),MaxValueValidator(50)])
     reagent1AgitateSecs = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(1000)])
-    reagent1DropCount = models.IntegerField(default=0, null=True, validators=[MinValueValidator(1),MaxValueValidator(50)])
     reagent2Slot = models.ForeignKey(ReagentSetup, related_name="reagent2", on_delete=models.CASCADE, null=True, blank=True)
+    reagent2DispenseType=models.CharField(max_length=6, choices=MEASUREMENT_CHOICES, default='Drops', help_text="How to measure dispensing")
+    reagent2DispenseCount = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(50)])
     reagent2AgitateSecs = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(1000)])
-    reagent2DropCount = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(50)])
     reagent3Slot = models.ForeignKey(ReagentSetup, related_name="reagent3", on_delete=models.CASCADE, null=True, blank=True)
+    reagent3DispenseType=models.CharField(max_length=6, choices=MEASUREMENT_CHOICES, default='Drops', help_text="How to measure dispensing")
+    reagent3DispenseCount = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(50)])
     reagent3AgitateSecs = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(1000)])
-    reagent3DropCount = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(50)])
     agitateMixtureSecs = models.IntegerField(default=0, validators=[MinValueValidator(0),MaxValueValidator(1000)])
     delayBeforeReadingSecs = models.IntegerField(default=0, validators=[MinValueValidator(0),MaxValueValidator(1000)])
     colorChartToUse = models.ForeignKey(ColorSheetExternal, on_delete=models.CASCADE)

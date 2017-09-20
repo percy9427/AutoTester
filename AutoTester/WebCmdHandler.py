@@ -1,8 +1,16 @@
 '''
-Created on Aug 4, 2017
-This module receives commands from webpages
-@author: eussrh
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
+
+This module receives commands from the Web interface and executes them.
+
+@author: Stephen Hayes
 '''
+
 from AutoTester import saveVideo,queuePlungerMove,queueCarouselMove,agitatorStart,agitatorStop,generateCameraCalibrationModel, \
     purgeLine,cleanMixer,fillMixingCylinder,runTestSequence,loadFeatureWindow,centerReagent,setPlungerToOpen,setPlungerToClosed, \
     testLeftLetter,testRightLetter,dispenseDrops,evaluateResults,queueTestJob    # @UnresolvedImport

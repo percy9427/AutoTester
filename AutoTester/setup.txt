@@ -10,7 +10,8 @@ Step 2. Install it onto a microSD card (8GB should be sufficient) according to t
 Step 3. Once the Raspian image has been written onto the SD card, you need to set it up so it can be accessed externally.
 For this you need to do two things: enable ssh so you can control it remotely, and enable wifi (unless you prefer ethernet)
 a. To enable ssh, create an empty file named "ssh" (no extension) on the boot directory.  The boot directory is the one that Windows sees.
-b. Enable wifi according to these instructions: sudo 
+b. Enable wifi according to these instructions: https://howchoo.com/g/ndy1zte2yjn/how-to-set-up-wifi-on-your-raspberry-pi-without-ethernet
+(In step b.  Make sure to change the text to your network credentials)
 
 Step 4. Insert the microSD card into the Raspberry Pi and power it up.  Since it will allocate its ip address using DHCP, you may have to
 search to find the new device.  Once you have identified it, you can SSH to it and start the configuration process.  There are various
@@ -40,14 +41,31 @@ Start with step #2 of the guide and setup the virtual environment using Python3.
 This is the longest step of the install process.  Note that in setting up the virtual environment where you append the virtualenv path
 to the ~/.profile file, I needed to add the line: "export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3" before "source /usr/local/bin/virtualenvwrapper.sh".
 
-Step 8. We need to install more computer vision and machine learning libraries.  These are simpler, but also take a long time to install.
+Step 8. We need to increase the swap size to install the following packages which seem to require lots of memory:
+sudo nano /etc/dphys-swapfile
+change to CONF_SWAPSIZE=2048 and then reboot
+
+Step 9. We need to install more computer vision and machine learning libraries.  These are simpler to install, but also take a long time to install.
 Make sure you are within the cv virtual environment when running these steps.
 sudo apt-get install libboost-all-dev -y
+sudo pip install numpy
 sudo pip install dlib
+sudo pip3 install scipy -v
 sudo pip install scikit-learn -v
+sudo pip install scikit-image -v
 
-Step 9. Let's start installing dependencies.  The first set is for django which is the web framework
+Step 10. Then there are a lot of other dependencies. These should all be installed within the virtual environment (cv) created in step 7.
+sudo apt-get install screen -y
+sudo apt-get install git -y
 sudo pip install django
+sudo pip install rpyc
+sudo pip install schedule
+
+Step 11. We need to copy in the autotester software.  This should be done within the virtual environment (cv)
+cd ~
+git clone 
+
+
 
 
 

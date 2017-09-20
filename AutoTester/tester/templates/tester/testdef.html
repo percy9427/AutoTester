@@ -16,7 +16,7 @@
 		{% for test in testDefList %}
 		<tr>
 		<td><input type="submit" name="testListAction" class="testEditButton" id="testEdit" value="EDIT {{test.testName}}"></td>			
-		<td><input type="submit" name="testListAction" class="testDeleteButton" id="testDel" value="DELETE {{test.testName}}"></td>
+		<td><input type="submit" name="testListAction" class="testDeleteButton" id="testDel" value="DELETE {{test.testName}}" onclick="return confirm('Are You Sure?')"></td>
 		</tr>			
 		{% endfor %}
 	</table>

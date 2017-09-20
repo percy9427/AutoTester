@@ -1,4 +1,17 @@
-from django.shortcuts import render, get_object_or_404
+'''
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
+
+This module configures the autotester views for django.
+
+@author: Stephen Hayes
+'''
+
+from django.shortcuts import render, get_object_or_404, redirect
 from django.template import loader
 from django.urls import reverse
 from django.contrib import messages
@@ -43,10 +56,23 @@ def getDisplayInfo(request):
 def index(request,formResult):
     return home(request,formResult)   
 
+def navigate(request):
+    jumpLoc=None
+    try:
+        whereToGo=request.GET['navButton']
+        sendCmdToTester('CLEAR') 
+        jumpLoc="/tester/" + whereToGo + "/"
+        return jumpLoc
+    except:
+        pass
+    
+   
 @login_required
 def home(request,formResult):
-#    if request.method=='GET':
-#        sendCmdToTester('CLEAR')        
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     streamingURL,imageWidth,imageHeight=getDisplayInfo(request)
     pageName='Home'
     formToProcess=None
@@ -123,10 +149,14 @@ def home(request,formResult):
         currentResult+=1
     context={'pageName':pageName,'streamingURL':streamingURL, 'testList':testList,'jobList':jobList}
     return render(request,'tester/home.html',context)
-   
+
 @login_required
 def history(request,formResult):
     pageName='History'
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     if request.method=='POST':
         test="All"
         cmd=request.POST['display']
@@ -146,8 +176,10 @@ def history(request,formResult):
 @login_required
 def control(request,formResult):
     pageName='Control'
-#    if request.method=='GET':
-#        sendCmdToTester('CLEAR')        
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     streamingURL,imageWidth,imageHeight=getDisplayInfo(request)
     if request.method=='POST':
         try:
@@ -168,8 +200,8 @@ def control(request,formResult):
     context={'pageName':pageName,'streamingURL':streamingURL,'lastStepSize':lastStepSize,'stepSizeList':stepSizeList}
     return render(request,'tester/control.html',context)
 
-@login_required
-def generateFeatureOptions(featureBeingUsed):
+
+def generateFeatureOptionsX(featureBeingUsed):
     if featureBeingUsed is None:
         return None
     try:
@@ -183,11 +215,14 @@ def generateFeatureOptions(featureBeingUsed):
          
     except:
         return None  
+
 @login_required
 def train(request,formResult):
     pageName='Feature Training'
-#    if request.method=='GET':
-#        sendCmdToTester('CLEAR')        
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     streamingURL,imageWidth,imageHeight=getDisplayInfo(request)
     if request.method=='POST':
         feat=None
@@ -201,7 +236,6 @@ def train(request,formResult):
     featureList=TesterFeatureExternal.objects.exclude(userTrainable=False)
     currentlySelected=feat
     stepSizeList=['1','5','10','30']
-    categoryList=generateFeatureOptions(currentlySelected)
     context={'pageName':pageName,'streamingURL':streamingURL,'currentlySelected':currentlySelected,'featureList':featureList,'lastStepSize':lastStepSize,'stepSizeList':stepSizeList}
     return render(request,'tester/train.html',context)
 
@@ -240,8 +274,10 @@ def getSwatchImageFile(staticFolderPath):
 @login_required
 def colorsheet(request,formResult):
     pageName='Setup ColorSheets'
-#    if request.method=='GET':
-#        sendCmdToTester('CLEAR')        
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     colorSheetImage=None
     streamingURL,imageWidth,imageHeight=getDisplayInfo(request)
     if request.method=='POST':
@@ -362,6 +398,10 @@ def colorsheet(request,formResult):
 @login_required
 def schedule(request,formResult):
     pageName='Setup Schedules'
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     if request.method=='POST':
         ScheduleFormSet=modelformset_factory(TestSchedule, form=ScheduleForm,extra=0)
         schedFormSet=ScheduleFormSet(request.POST)
@@ -389,6 +429,10 @@ def schedule(request,formResult):
 @login_required
 def testdef(request,formResult):
     pageName='Define Test Sequences'
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     if request.method=='POST':
         try:
             testListButtonStr=request.POST['testListAction']
@@ -434,32 +478,47 @@ def testdef(request,formResult):
                 except:
                     testDef=TestDefinitionForm(request.POST)
             if testDef.is_valid():                
-                testDefToSave=testDef.save()
-                #We saved the new or changed test def.  Now update any schedule objects
+                testDefToSave=testDef.save(commit=False)
+                retryTestSetup=False
                 newTestName=testDefToSave.testName
-                if originalTestName=='New Test':
-                    newTestSched=TestSchedule()
-                    newTestSched.testToSchedule=newTestName
-                    newTestSched.save()
+                if testDefToSave.reagent1DispenseType=='drops' and (testDefToSave.reagent1DispenseCount-int(testDefToSave.reagent1DispenseCount)>0):
+                    messages.error(request,'Reagent1 must be an integer number of drops')
+                    retryTestSetup=True
+                elif testDefToSave.reagent2DispenseType=='drops' and (testDefToSave.reagent2DispenseCount-int(testDefToSave.reagent2DispenseCount)>0):
+                    messages.error(request,'Reagent1 must be an integer number of drops')
+                    retryTestSetup=True
+                elif testDefToSave.reagent3DispenseType=='drops' and (testDefToSave.reagent3DispenseCount-int(testDefToSave.reagent3DispenseCount)>0):
+                    messages.error(request,'Reagent1 must be an integer number of drops')
+                    retryTestSetup=True
                 else:
-                    if originalTestName==newTestName:
-                        pass  #New and old name the same, no need to do anything
+                #We saved the new or changed test def.  Now update any schedule objects
+                    testDefToSave.save()
+                    testDef.save_m2m()
+                    messages.success(request,'Test ' + testDefToSave.testName + ' saved')
+                    if originalTestName=='New Test':
+                        newTestSched=TestSchedule()
+                        newTestSched.testToSchedule=newTestName
+                        newTestSched.save()
                     else:
-                        try:
-                            oldTestSched=TestSchedule.objects.get(testToSchedule=originalTestName)
-                        except:
-                            oldTestSched=TestSchedule()
-                        oldTestSched.testToSchedule=newTestName
-                        oldTestSched.save()                    
+                        if originalTestName==newTestName:
+                            pass  #New and old name the same, no need to do anything
+                        else:
+                            try:
+                                oldTestSched=TestSchedule.objects.get(testToSchedule=originalTestName)
+                            except:
+                                oldTestSched=TestSchedule()
+                            oldTestSched.testToSchedule=newTestName
+                            oldTestSched.save()                    
                 testDefList=TestDefinition.objects.all()
-                context={'pageName':pageName,'testDefList':testDefList}
-                messages.success(request,'Test ' + testDefToSave.testName + ' saved')
+                if retryTestSetup:
+                    context={'originalTestName':newTestName,'testToChange':newTestName,'testDef':testDef}
+                else:    
+                    context={'pageName':pageName,'testDefList':testDefList}
             else:
                 testToChange=originalTestName
                 context={'pageName':pageName,'originalTestName':originalTestName,'testToChange':testToChange,'testDef':testDef}
         elif testButtonStr=='Cancel':
-            testDefList=TestDefinition.objects.all()
-            context={'pageName':pageName,'testDefList':testDefList}
+            return redirect('/tester/testdef/')
     else:
         testDefList=TestDefinition.objects.all()
         context={'pageName':pageName,'testDefList':testDefList}
@@ -468,6 +527,10 @@ def testdef(request,formResult):
 @login_required
 def reagent(request,formResult):
     pageName='Setup Reagents'
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     if request.method=='POST':
         ReagentFormSet=modelformset_factory(ReagentSetup, form=ReagentForm,extra=0)
         reagFormSet=ReagentFormSet(request.POST)
@@ -493,6 +556,10 @@ def reagent(request,formResult):
 @login_required
 def logs(request,formResult):
     pageName='Display Logs'
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     logToDisplay="Info"
     logPath=getBasePath() + 'Logs'
     if request.method=='POST':
@@ -528,6 +595,10 @@ def logs(request,formResult):
 @login_required
 def admin(request,formResult):
     pageName='Administrative Setup'
+    if request.method=='GET':
+        jumpLoc=navigate(request) 
+        if not jumpLoc is None:
+            return redirect(jumpLoc)    
     if request.method=='POST':
         adminAction=request.POST["actionButton"]
         if adminAction=='CANCEL':

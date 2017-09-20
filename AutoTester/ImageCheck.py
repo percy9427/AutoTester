@@ -1,8 +1,16 @@
 '''
-Created on Nov 14, 2016
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
 
-@author: eussrh
+This module performs image recognition tasks.
+
+@author: Stephen Hayes
 '''
+
 from __future__ import division
 import cv2   # @UnresolvedImport
 import numpy as np

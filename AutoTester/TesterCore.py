@@ -1,10 +1,17 @@
 '''
-Created on Aug 18, 2016
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
 
-@author: eussrh
+This module is the interface towards the autotester physical hardware and the database.
+The tester Class is the primary class representing the machine.
 
-This is core code for the autotester
+@author: Stephen Hayes
 '''
+
 import cv2   # @UnresolvedImport
 import numpy as np
 import math
@@ -268,6 +275,8 @@ class Tester:
         te=TesterExternal.objects.get(pk=1)
         self.testerName=te.testerName
         self.testerVersion=te.testerVersion
+        self.dbModelVersion=te.dbModelVersion
+        self.virtualEnvironmentName=te.virtualEnvironmentName
         self.lensType=te.lensType
         self.cameraWidthLowRes=te.cameraWidthLowRes
         self.cameraHeightLowRes=te.cameraHeightLowRes
@@ -342,17 +351,20 @@ class Tester:
             if not ts.reagent1Slot is None:
                 ts.reagent1Slot=seq.reagent1Slot.slotName
             ts.reagent1AgitateSecs=seq.reagent1AgitateSecs
-            ts.reagent1DropCount=seq.reagent1DropCount
+            ts.reagent1DispenseType=seq.reagent1DispenseType
+            ts.reagent1DispenseCount=seq.reagent1DispenseCount
             ts.reagent2Slot=seq.reagent2Slot
             if not ts.reagent2Slot is None:
                 ts.reagent2Slot=seq.reagent2Slot.slotName
             ts.reagent2AgitateSecs=seq.reagent2AgitateSecs
-            ts.reagent2DropCount=seq.reagent2DropCount
+            ts.reagent2DispenseType=seq.reagent2DispenseType
+            ts.reagent2DispenseCount=seq.reagent2DispenseCount
             ts.reagent3Slot=seq.reagent3Slot
             if not ts.reagent3Slot is None:
                 ts.reagent3Slot=seq.reagent3Slot.slotName
             ts.reagent3AgitateSecs=seq.reagent3AgitateSecs
-            ts.reagent3DropCount=seq.reagent3DropCount
+            ts.reagent3DispenseType=seq.reagent3DispenseType
+            ts.reagent3DispenseCount=seq.reagent3DispenseCount
             ts.agitateMixtureSecs=seq.agitateMixtureSecs
             ts.delayBeforeReadingSecs=seq.delayBeforeReadingSecs
             ts.colorChartToUse=seq.colorChartToUse.colorSheetName
@@ -467,9 +479,9 @@ class Tester:
     def saveReagentPosition(self,reagent):
         from tester.models import ReagentSetup
         if ReagentSetup.objects.get(slotName=reagent).hasAgitator:
-            remainingML=self.maxPlungerDepthAgitator+self.plungerSteps/self.plungerStepsPerMM
+            remainingML=round(self.maxPlungerDepthAgitator+self.plungerSteps/self.plungerStepsPerMM,2)
         else:
-            remainingML=self.maxPlungerDepthNoAgitator+self.plungerSteps/self.plungerStepsPerMM
+            remainingML=round(self.maxPlungerDepthNoAgitator+self.plungerSteps/self.plungerStepsPerMM,2)
         self.lastReagentRemainingML=remainingML
         reagentObj=ReagentSetup.objects.get(slotName=reagent)
         reagentObj.fluidRemainingInML=remainingML
@@ -498,7 +510,7 @@ class Tester:
             return None,None
         
     def fakeFrame(self):  #Used for simulation on windows computer
-        simulationImageFN=self.basePath + 'Images/SimulationImage-' + str(self.cameraHeightLowRes) + 'x' + str(self.cameraWidthLowRes) + '.jpg'
+        simulationImageFN=self.basePath + 'Simulation/SimulationImage-' + str(self.cameraHeightLowRes) + 'x' + str(self.cameraWidthLowRes) + '.jpg'
         simulationImage=cv2.imread(simulationImageFN)
         return simulationImage
         
@@ -514,6 +526,7 @@ class Tester:
         except:
             traceback.print_exc()
             self.infoMessage('No camera found')
+            self.systemStatus="Stopped - No Camera Found"
             return self.CAMERATYPE_NONE
             
     def webcamInitialize(self):

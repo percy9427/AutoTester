@@ -1,9 +1,15 @@
 '''
-Created on May 10, 2017
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
 
-@author: eussrh
+This module is the main server module which runs the tests and hosts the streaming video of the tester.
+
+@author: Stephen Hayes
 '''
-
 import rpyc   # @UnresolvedImport
 from TesterCore import Tester,getBasePath
 import time
@@ -62,9 +68,23 @@ def screenPresent(name):
     index=var.find(name)
     return index>-1
 
-def runWebserver(tester,name):
+def runWebserverOld(tester,name):
     from subprocess import call
-    call(["sudo","screen","-d","-m","-S",name,"python3", "/home/pi/AutoTesterv2/manage.py","runserver","0.0.0.0:" + str(tester.webPort)])            
+    call(["screen","-d","-m","-S",name,"python3", "/home/pi/AutoTesterv2/manage.py","runserver","0.0.0.0:" + str(tester.webPort)])            
+
+def generateWebLaunchFile(tester):
+    launchFile=tester.basePath + "/launchWebServer.sh"
+    launchText="#!/bin/bash\nexport WORKON_HOME=$HOME/.virtualenvs\nexport VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3\nsource /usr/local/bin/virtualenvwrapper.sh\nworkon "
+    launchText = launchText + tester.virtualEnvironmentName + "\n"
+    launchText=launchText + tester.basePath + '/manage.py runserver 0.0.0.0:' + str(tester.webPort) + '\n'
+    f=open(launchFile,"w+")
+    f.write(launchText)
+    f.close()
+    
+def runWebServer(tester,name):
+    from subprocess import call
+    generateWebLaunchFile(tester,"Joe")
+    call(["screen","-d","-m","-S",name,"bash", "launchWebServer.sh" ])   
 
 def sleepUntilNextInterval(lastTime,intervalInSeconds):
     timeInterval=datetime.timedelta(seconds=intervalInSeconds)
@@ -1152,6 +1172,7 @@ def findReferenceDots():
             return True
     except:
         tester.debugLog.exception("Unable to Find Reference Dots")
+        tester.systemStatus='Error - Cannot find Reference Dots'
         return False  
     
 def parkTester(tester):
@@ -1384,7 +1405,10 @@ def checkTestRange(tester,ts,results):
             sendOutOfLimitsWarning(tester,ts.testName,results)
             alarmSent=True        
 
-def runTestStep(tester,testStepNumber,testName,waterVolInML,reagentSlot,agitateSecs,dropsToDispense,lastStep=False):
+def convertMLtoDrops(mlToDispense):
+    return round(20*mlToDispense)
+    
+def runTestStep(tester,testStepNumber,testName,waterVolInML,reagentSlot,agitateSecs,reagentDispenseType,amountToDispense,lastStep=False):
     tester.testStatus='Rotating to Reagent ' + str(testStepNumber)
     success=rotateToPosition(tester,reagentSlot)
     if not success:
@@ -1404,9 +1428,11 @@ def runTestStep(tester,testStepNumber,testName,waterVolInML,reagentSlot,agitateS
         agitatorStart(tester)
         time.sleep(agitateSecs)
         agitatorStop(tester)
-    tester.testStatus='Dispensing ' + str(dropsToDispense) + ' drops. (No Video)'
+    tester.testStatus='Dispensing ' + str(amountToDispense) + ' ' + reagentDispenseType + '. (Video Disabled)'
 #    print('Video disabled while dispensing drops')
     time.sleep(1)
+    if reagentDispenseType=='ml':
+        dropsToDispense=convertMLtoDrops(amountToDispense)
     success=dispenseDrops(tester,dropsToDispense,waitUntilPlungerRaised=False,reagent=reagentSlot)
     if not success:
         sendDispenseAlarm(tester,reagentSlot,tester.lastReagentRemainingML)
@@ -1422,7 +1448,7 @@ def runTestStep(tester,testStepNumber,testName,waterVolInML,reagentSlot,agitateS
             print('Lifting Plunger')
             time.sleep(1)
     return True
-    
+
 def runTestSequence(tester,sequenceName):
     tester.systemStatus="Running Test"
     tester.infoMessage('Running Test ' + sequenceName)
@@ -1446,14 +1472,14 @@ def runTestSequence(tester,sequenceName):
             tester.systemStatus="Fault"
             return False
         testSucceeded=False
-        if not ts.reagent1Slot is None and ts.reagent1DropCount>0:
-            success=runTestStep(tester,1,sequenceName,ts.waterVolInML,ts.reagent1Slot,ts.reagent1AgitateSecs,ts.reagent1DropCount,lastStep=numSteps==1)
+        if not ts.reagent1Slot is None and ts.reagent1DispenseCount>0:
+            success=runTestStep(tester,1,sequenceName,ts.waterVolInML,ts.reagent1Slot,ts.reagent1AgitateSecs,ts.reagent1DispenseType,ts.reagent1DispenseCount,lastStep=numSteps==1)
             testSucceeded=success
-            if success and not ts.reagent2Slot is None and ts.reagent2DropCount>0 and not tester.abortJob:
-                success=runTestStep(tester,2,sequenceName,0,ts.reagent2Slot,ts.reagent2AgitateSecs,ts.reagent2DropCount,lastStep=numSteps==2)
+            if success and not ts.reagent2Slot is None and ts.reagent2DispenseCount>0 and not tester.abortJob:
+                success=runTestStep(tester,2,sequenceName,0,ts.reagent2Slot,ts.reagent2AgitateSecs,ts.reagent2DispenseType,ts.reagent2DispenseCount,lastStep=numSteps==2)
                 testSucceeded=success
-                if success and not ts.reagent3Slot is None and ts.reagent3DropCount>0  and not tester.abortJob:
-                    success=runTestStep(tester,3,sequenceName,0,ts.reagent3Slot,ts.reagent3AgitateSecs,ts.reagent3DropCount,lastStep=numSteps==3)
+                if success and not ts.reagent3Slot is None and ts.reagent3DispenseCount>0  and not tester.abortJob:
+                    success=runTestStep(tester,3,sequenceName,0,ts.reagent3Slot,ts.reagent3AgitateSecs,ts.reagent3DispenseType,ts.reagent3DispenseCount,lastStep=numSteps==3)
                     testSucceeded=success
         if testSucceeded and not tester.abortJob:
             findLightingEnvironment(tester)

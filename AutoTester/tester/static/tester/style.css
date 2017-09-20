@@ -77,6 +77,15 @@ table {
     border-radius: 8px; 
 }
 
+.csButton {
+	background-color: aqua;
+    width: 100px;
+    height: 20px;
+    margin: 0px;
+    border: 2px solid #ff00ff;  
+    border-radius: 8px; 
+}
+
 .diagButton {display: inline-block;
 	background-color: #ff6600;
     width: 160px;

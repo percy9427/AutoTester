@@ -1,4 +1,4 @@
-{% extends 'tester/base.html' %}
+{% extends 'tester/refreshbase.html' %}
 
 {% block content %}
 <img src='http://{{streamingURL}}/tester.mjpg'  title="Live feed from inside the autotester">
@@ -24,11 +24,11 @@ Test Queue<br>
 			<td><input type="input" name="timeStamp" title="When the job was completed or queued" value="{{job.timeStamp}}" /></td>
 			<td><button type="submit" form="updateQueue" name="jobAction" 
 			{% if job.jobAction == "DELETE" %}
-				title="Delete this job from the queue" 
+				title="Delete this job from the queue" onclick="return confirm('Are You Sure?')" 
 			{% elif job.jobAction == "REMOVE" %}
-				title="Remove this job from the queue" 
+				title="Remove this job from the queue"  onclick="return confirm('Are You Sure?')
 			{% elif job.jobAction == "CANCEL" %}
-				title="Abort this job" 
+				title="Abort this job"  onclick="return confirm('Are You Sure?')
 			{% endif %}
 			value="{{job.jobAction}}-{{job.jobIndex}}">{{job.jobAction}}</button></td>
 			</tr>

@@ -1,7 +1,15 @@
 '''
-Created on Feb 28, 2017
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
+Created on Aug 9, 2017
 
-@author: eussrh
+This performs calibration of a camera using checkerboard images. I got a lot of this code
+off the web, but can't find the link anymore.  So you are welcome to this module.
+
+@author: Stephen Hayes
 '''
 import cv2  # @UnresolvedImport
 assert cv2.__version__[0] == '3', 'The fisheye module requires opencv version >= 3.0.0'

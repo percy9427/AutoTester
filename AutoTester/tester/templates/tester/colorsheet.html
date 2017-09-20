@@ -18,11 +18,11 @@ ColorSheet Action:<br>
 		{% endif %}
 	{% endfor %}
 	<br>
-	<input type="submit" title="View the selected colorsheet" name="csAction" value="VIEW">
-	<input type="submit" title="Edit the selected colorsheet" name="csAction" value="EDIT">
-	<input type="submit" title="Delete the selected colorsheet" name="csAction" value="DELETE">
-	<input type="submit" title="Create a new colorsheet with the specified name" name="csAction" value="NEW">
-	<input type="submit" title="Rename the specified colorsheet to the new name" name="csAction" value="RENAME AS">
+	<input type="submit" class="csButton" title="View the selected colorsheet" name="csAction" value="VIEW">
+	<input type="submit" class="csButton" title="Edit the selected colorsheet" name="csAction" value="EDIT">
+	<input type="submit" class="csButton" title="Delete the selected colorsheet" name="csAction" value="DELETE" onclick="return confirm('Are You Sure?')">
+	<input type="submit" class="csButton" title="Create a new colorsheet with the specified name" name="csAction" value="NEW">
+	<input type="submit" class="csButton" title="Rename the specified colorsheet to the new name" name="csAction" value="RENAME AS">
 	<input type="text" name="newName" title="Name of the new or renamed the colorsheet" value="New Name">
 </form>
 {% endif %}

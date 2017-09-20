@@ -1,9 +1,15 @@
 '''
+AutoTester is the controlling software to automatically run water tests
+Further info can be found at: https://robogardens.com/?p=928
+This software is free for DIY, Nonprofit, and educational uses.
+Copyright (C) 2017 - RoboGardens.com
+    
 Created on Aug 9, 2017
 
-@author: eussrh
+This module handles sending alarms and reports using the IFTTT webhooks mechanism.
+
+@author: Stephen Hayes
 '''
-"""Handle sending API requests to the IFTTT Webhooks Channel"""
 
 import requests    # @UnresolvedImport
 
