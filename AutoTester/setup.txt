@@ -65,7 +65,11 @@ pip install requests
 
 Step 10. We need to copy in the autotester software.  This should be done within the virtual environment (cv)
 cd ~
-git clone 
+git clone https://github.com/percy9427/AutoTester.git
+
+From within the program: 
+cd AutoTester/AutoTester
+python AutoTester.py
 
 
 

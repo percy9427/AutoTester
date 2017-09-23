@@ -69,13 +69,13 @@ def screenPresent(name):
 
 def runWebserverOld(tester,name):
     from subprocess import call
-    call(["screen","-d","-m","-S",name,"python3", "/home/pi/AutoTesterv2/manage.py","runserver","0.0.0.0:" + str(tester.webPort)])            
+    call(["screen","-d","-m","-S",name,"python3", "/home/pi/AutoTesterv2/manage.py","runserver","0.0.0.0:" + str(tester.webPort),"--insecure"])            
 
 def generateWebLaunchFile(tester):
     launchFile=tester.basePath + "/launchWebServer.sh"
     launchText="#!/bin/bash\nexport WORKON_HOME=$HOME/.virtualenvs\nexport VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3\nsource /usr/local/bin/virtualenvwrapper.sh\nworkon "
     launchText = launchText + tester.virtualEnvironmentName + "\n"
-    launchText=launchText + 'python ' + tester.basePath + 'manage.py runserver 0.0.0.0:' + str(tester.webPort) + '\n'
+    launchText=launchText + 'python ' + tester.basePath + 'manage.py runserver 0.0.0.0:' + str(tester.webPort) + ' --insecure\n'
     f=open(launchFile,"w+")
     f.write(launchText)
     f.close()
@@ -1777,7 +1777,7 @@ if __name__ == '__main__':
         if screenPresent(testerWebName):
             tester.infoMessage('Web port already active, so not relaunched')
         else:
-            tester.infoMessage('Web port not active, so launching webserver')
+            tester.infoMessage('Web port not active, so launching webserver on port: ' + str(tester.webPort))
             runWebServer(tester,testerWebName)
     tester.videoLowResCaptureLock=threading.Condition()
     tester.captureImageLock=threading.Condition()
