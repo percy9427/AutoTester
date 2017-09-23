@@ -58,7 +58,7 @@ class feature:
         tester.currentFeature=self
         tester.featureShow=True
         
-    def clipImage(self,tester,image):
+    def clipImage(self,tester,image,rowOffset=0,colOffset=0):
         if tester.jigglePhoto:
             rowShift=randomDest=random.randint(-tester.jiggleShiftMax,tester.jiggleShiftMax)
             colShift=randomDest=random.randint(-tester.jiggleShiftMax,tester.jiggleShiftMax)
@@ -66,10 +66,10 @@ class feature:
             rowShift=0
             colShift=0
 #        distanceScaling=tester.avgDotDistance/self.learnedWithReferenceDistance
-        ulRow=int(round(self.ulClipRowOffset+tester.referenceCenterRow))+rowShift
-        ulCol=int(round(self.ulClipColOffset+tester.referenceCenterCol))+colShift
-        lrRow=int(round(self.lrClipRowOffset+tester.referenceCenterRow))+rowShift
-        lrCol=int(round(self.lrClipColOffset+tester.referenceCenterCol))+colShift
+        ulRow=int(round(self.ulClipRowOffset+tester.referenceCenterRow))+rowShift+rowOffset
+        ulCol=int(round(self.ulClipColOffset+tester.referenceCenterCol))+colShift+colOffset
+        lrRow=int(round(self.lrClipRowOffset+tester.referenceCenterRow))+rowShift+rowOffset
+        lrCol=int(round(self.lrClipColOffset+tester.referenceCenterCol))+colShift+colOffset
         box=image[ulRow:lrRow,ulCol:lrCol,:]
         return box
 

@@ -462,9 +462,11 @@ def queuePlungerMove(tester,distanceToMove,speed=None):
             time.sleep(.5)
     return True
 
-def markPlungerAsClosed(tester,origin=None):
-#    print('Close queued from ' + origin)
+def markPlungerAsClosed(tester):
     return queuePlungerMove(tester,tester.SET_HOME_POSITION)
+    
+def tightenPlungerPastClosedPosition(tester):
+    return queuePlungerMove(tester,tester.TIGHTEN_PAST_HOME_POSITION)
     
 def movePlungerProcess():
     tester.plungerMoving=False
@@ -476,6 +478,7 @@ def movePlungerProcess():
         plungerMoveSpeed=tester.speedToMovePlunger
         if not plungerMoveDistance is None:
             tester.plungerMoving=True
+            time.sleep(.1)
 #            print('Dequeuer - move plunger: ' + str(plungerMoveDistance))
             tester.movePlunger(plungerMoveDistance,speed=plungerMoveSpeed)
             tester.plungerMoving=False
@@ -528,59 +531,86 @@ def moveCarouselProcess():
         tester.carouselMoveQueued=False
         tester.moveCarouselLock.release()
         
-def getPlungerCarouselGap(tester):
-    gapFeature=tester.featureList["Carousel Gap"]
+def findImageShift(tester,carouselFeature,latestFullImage,maxShift):
+    shiftValues=[]
+    minImageDiff=100000000000
+    for shiftIndex in range(maxShift):
+        shiftedImage=carouselFeature.clipImage(tester,latestFullImage,rowOffset=-shiftIndex)
+        diff=cv2.absdiff(shiftedImage,tester.carouselBaseLineImage)
+        diffSum=np.sum(diff)
+        if diffSum<minImageDiff:
+            minShift=shiftIndex
+            minImageDiff=diffSum
+        shiftValues.append(diffSum)
+    return minShift
+        
+def liftPlungerASmallBit(tester,distance=.2,firstCall=False):
+    carouselFeature=tester.featureList["Carousel"]
+    if firstCall:
+        tester.videoLowResCaptureLock.acquire()
+        tester.videoLowResCaptureLock.wait()
+        tester.carouselBaseLineImage=carouselFeature.clipImage(tester,tester.latestLowResImage)
+        tester.videoLowResCaptureLock.release()
+    queuePlungerMove(tester,distance)
+    waitUntilPlungerStopsMoving(tester)
     tester.videoLowResCaptureLock.acquire()
     tester.videoLowResCaptureLock.wait()
-    gapImage=gapFeature.clipImage(tester,tester.latestLowResImage)
+    latestFullImage=tester.latestLowResImage.copy()
     tester.videoLowResCaptureLock.release()
-    gapScore=gapFeature.computeGapDarkness(gapImage)
-#    print('gapScore: ' + str(gapScore) + ', plungerMoving: ' + str(tester.plungerMoving) + ', plungerStepping: ' + str(tester.plungerStepping))
-    return gapScore  
+    bestShiftMatch=findImageShift(tester,carouselFeature,latestFullImage,3)
+#    tester.carouselBaseLineImage=carouselFeature.clipImage(tester,latestFullImage)
+    return bestShiftMatch
 
-def calibratePlunger(tester): 
-    #This assumes that the plunger is set to closed position
-    gap=getPlungerCarouselGap(tester)
-    tester.seatedGap=round(gap,2)  
-    queuePlungerMove(tester,-5)  #Descend 5 mm
-    gap=getPlungerCarouselGap(tester)
-    tester.unSeatedGap=round(gap,2) 
-    tester.saveStartupParametersToDB()
-    setPlungerToClosed(tester)
-    tester.debugLog.info('Plunger Calibrated')
+def determineStopperClosureValue(tester):
+    rightStopperFeature=tester.featureList["Right Stopper"]
+    tester.videoLowResCaptureLock.acquire()
+    tester.videoLowResCaptureLock.wait()
+    rightStopperImage=rightStopperFeature.clipImage(tester,tester.latestLowResImage)
+    tester.videoLowResCaptureLock.release()
+    verticalsFound=testDlibForVerticalPosition(rightStopperFeature,rightStopperImage)
+    highestStopper=99999
+    for vertical in verticalsFound:
+        if vertical<highestStopper:
+            highestStopper=vertical
+    return highestStopper
+
+def testPlungerPosition(tester,detectMotion=False):
+    if tester.valueForStopperWhenClosed is None:
+        return 'Unknown'
+    currentStopperClosureValue=determineStopperClosureValue(tester)
+    if currentStopperClosureValue<=tester.valueForStopperWhenClosed:
+        print('Closed')
+        return 'Closed'
+    else:
+        print('Open')
+        return 'Open'
     
-def initializePlungerPosition(tester):
-    gap=getPlungerCarouselGap(tester)
-    if gap>=(tester.seatedGap-tester.gapTolerance):
-        markPlungerAsClosed(tester,origin='1')
-        tester.debugLog.info('Plunger Marked As Closed')
+def setPlungerToClosed(tester,runAsDiagnostic=False,ignorePlungerStatus=False): 
+    if tester.plungerState==tester.PLUNGER_FULLY_CLOSED and not ignorePlungerStatus:
+        return True
+    if tester.plungerState==tester.PLUNGER_MOSTLY_CLOSED or tester.plungerState==tester.PLUNGER_UNKNOWN or ignorePlungerStatus:    
+        queuePlungerMove(tester,-tester.mmToRaiseFromOpenToFullyClosed-1)  #lower 5 mm from raised position
+        time.sleep(1)
+        waitUntilPlungerStopsMoving(tester)
+    ascentStep=0
+    increment=.2
+    maxAscentSteps=int(tester.maxPlungerDepthNoAgitator/increment)
+    currentShift=0
+    initialLift=True
+    while ascentStep<maxAscentSteps and currentShift<1:
+        currentShift=liftPlungerASmallBit(tester,distance=increment,firstCall=initialLift)
+        initialLift=False
+        ascentStep+=1
+    if ascentStep<maxAscentSteps:
+        if tester.stopperTighteningInMM>0:
+            tightenPlungerPastClosedPosition(tester)
+        if runAsDiagnostic:
+            tester.debugLog.info('Plunger Position Set to Closed')
+        markPlungerAsClosed(tester)
         return True
     else:
-        setPlungerToClosed(tester)
-               
-def setPlungerToClosed(tester,runAsDiagnostic=False): 
-    gap=getPlungerCarouselGap(tester)
-    if gap>=(tester.seatedGap-tester.gapTolerance):
-        markPlungerAsClosed(tester,origin='2')
-        return True
-    else:
-        maxAscentSteps=1000
-        ascentStep=0
-        increment=.2
-        currentGap=getPlungerCarouselGap(tester)
-        while ascentStep<maxAscentSteps and currentGap<=(tester.seatedGap-tester.gapTolerance):
-            queuePlungerMove(tester,increment)
-#            time.sleep(1)
-            currentGap=getPlungerCarouselGap(tester)
-            ascentStep+=1
-        if ascentStep<maxAscentSteps:
-            if runAsDiagnostic:
-                tester.debugLog.info('Plunger Position Set to Closed')
-            markPlungerAsClosed(tester,origin='3')
-            return True
-        else:
-            tester.debugLog.info('Unable to Detect Plunger Closure.  Plunger May be Stuck')
-            return False
+        tester.debugLog.info('Unable to Detect Plunger Closure.  Plunger May be Stuck')
+        return False
         
 def setPlungerPosition(tester,desiredPosition=None,runAsDiagnostic=False):
     try:
@@ -589,8 +619,11 @@ def setPlungerPosition(tester,desiredPosition=None,runAsDiagnostic=False):
             tester.debugLog.info('Plunger Position Set to Closed')
             return True
         elif desiredPosition==tester.PLUNGER_OPEN:
+            if tester.plungerState==tester.PLUNGER_OPEN or tester.plungerState==tester.PLUNGER_PAST_OPEN:
+                tester.debugLog.info('Plunger Already Open')
+                return True
             setPlungerToClosed(tester,runAsDiagnostic=runAsDiagnostic)
-            queuePlungerMove(tester,-tester.mmToRaiseFromOpenToFullyClosed-1)  #lower 5 mm from raised position
+            queuePlungerMove(tester,-tester.mmToRaiseFromOpenToFullyClosed-1)  #lower 6 mm from raised position
             tester.debugLog.info('Plunger Position Set to Open')
             return True
         else:
@@ -606,15 +639,6 @@ def setPlungerPosition(tester,desiredPosition=None,runAsDiagnostic=False):
 def setPlungerToOpen(tester,runAsDiagnostic=False):
     return setPlungerPosition(tester,desiredPosition=tester.PLUNGER_OPEN,runAsDiagnostic=runAsDiagnostic)    
 
-def testPlungerPosition(tester,detectMotion=False):
-    gap=getPlungerCarouselGap(tester)
-    if gap>tester.unseatedGap:
-        print('Closed')
-        return 'Closed'
-    else:
-        print('Open')
-        return 'Open'
-    
 def testReagentPosition(tester,precise=False):
     waitUntilCarouselStopsMoving(tester)
     if precise:
@@ -1206,7 +1230,7 @@ def parkTester(tester):
             if leftLetterPos=='A':
                 rightLetterPos=testRightLetter(tester)
                 if rightLetterPos=='B':
-                    markPlungerAsClosed(tester,origin='4')
+                    markPlungerAsClosed(tester)
                     markCarouselAsAtOrigin(tester)
                     tester.parked=True
                     print('Orientation Complete - already in parked position')
@@ -1219,7 +1243,7 @@ def parkTester(tester):
             if result:
                 while tester.plungerSteps is None:
                     print('Plunger steps still none')
-                    markPlungerAsClosed(tester,origin='6')
+                    markPlungerAsClosed(tester)
                 tester.parked=True
                 print('Parking Complete - now in parked position')
                 return True
@@ -1237,59 +1261,64 @@ def parkTester(tester):
         return False
     
 def orientTester():
-    tester.turnLedOn()
-    if tester.skipOrientation or tester.simulation:
-        tester.referenceMarkFound=True
-        tester.infoMessage('Orientation Skipped')
-        return True
-    time.sleep(4)  #Give camera time to stabilize
-    findLightingEnvironment(tester)
-    while not tester.referenceMarkFound:
-        findReferenceDots()
-#    initializePlungerPosition(tester)
-#    print('Plunger init complete')
-    nozzlePos=testPlungerPosition(tester)
-    if nozzlePos=="Closed":
+    try:
+        tester.turnLedOn()
+        if tester.skipOrientation or tester.simulation:
+            tester.referenceMarkFound=True
+            tester.infoMessage('Orientation Skipped')
+            return True
+        time.sleep(4)  #Give camera time to stabilize
+        findLightingEnvironment(tester)
+        while not tester.referenceMarkFound:
+            findReferenceDots()
+        setPlungerToClosed(tester,runAsDiagnostic=False,ignorePlungerStatus=True)
+        tester.valueForStopperWhenClosed=determineStopperClosureValue(tester)
         centeredStatus=testReagentPosition(tester)
         if centeredStatus=="Centered":
             leftLetterPos=testLeftLetter(tester)
             if leftLetterPos=='A':
                 rightLetterPos=testRightLetter(tester)
                 if rightLetterPos=='B':
-                    markPlungerAsClosed(tester,origin='7')
+                    markPlungerAsClosed(tester)
                     markCarouselAsAtOrigin(tester)
                     tester.parked=True
                     tester.systemStatus="Idle"
                     tester.infoMessage('Orientation Complete - already in parked position')
                     return True
-    waitUntilPlungerStopsMoving(tester)
-    print('Orientation - wasnt all setup')
-    result=setPlungerPosition(tester,desiredPosition=tester.PLUNGER_OPEN)
-    if result:
         waitUntilPlungerStopsMoving(tester)
-        result=rotateToPosition(tester,'A',precise=True)
+        result=setPlungerToOpen(tester)
         if result:
-            result=setPlungerPosition(tester,desiredPosition=tester.PLUNGER_FULLY_CLOSED)
+#            print('9-Plunger Opened 2')
+            waitUntilPlungerStopsMoving(tester)
+#            print('10-Plunger Opened 3')
+            result=rotateToPosition(tester,'A',precise=True)
+#            print('11-Coming back from the Rotate')            
             if result:
-                while tester.plungerSteps is None:
-                    print('Plunger steps still none')
-                    markPlungerAsClosed(tester,origin='8')
-                tester.parked=True
-                tester.systemStatus="Idle"
-                tester.infoMessage('Orientation Complete - now in parked position')
-                return True
+#                print('12-Plunger to be closed')
+                result=setPlungerToClosed(tester)
+#                print('13-Plunger closed')
+                if result:
+#                    while tester.plungerSteps is None:
+#                        print('Plunger steps still none')
+#                        markPlungerAsClosed(tester)
+                    tester.parked=True
+                    tester.systemStatus="Idle"
+                    tester.infoMessage('Orientation Complete - now in parked position')
+                    return True
+                else:
+                    tester.debugMessage('Unable to close stopper during initialization')
+                    tester.systemStatus="Fault"
+                    return False
             else:
-                tester.debugMessage('Unable to close stopper during initialization')
+                tester.debugMessage('Unable to rotate to origin position during initialization')
                 tester.systemStatus="Fault"
                 return False
         else:
-            tester.debugMessage('Unable to rotate to origin position during initialization')
+            tester.debugMessage('Unable to open stoppers during initialization')
             tester.systemStatus="Fault"
             return False
-    else:
-        tester.debugMessage('Unable to open stoppers during initialization')
-        tester.systemStatus="Fault"
-        return False
+    except:
+        tester.debugLog.exception("Orientation Failure")
     
 def purgeLine(tester):
     tester.openMixerValve()
@@ -1330,7 +1359,7 @@ def cleanMixer(tester):
             cleanCycle+=1
         agitatorStop(tester)
     except:
-        traceback.print_exc()
+        tester.debugLog.exception("Failure cleaning Mixer")
     
 def fillMixingCylinder(tester,vol=5):
     tester.closeMixerValve()

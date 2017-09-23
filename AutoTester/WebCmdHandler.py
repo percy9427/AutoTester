@@ -13,8 +13,8 @@ This module receives commands from the Web interface and executes them.
 
 from AutoTester import saveVideo,queuePlungerMove,queueCarouselMove,agitatorStart,agitatorStop,generateCameraCalibrationModel, \
     purgeLine,cleanMixer,fillMixingCylinder,runTestSequence,loadFeatureWindow,centerReagent,setPlungerToOpen,setPlungerToClosed, \
-    testLeftLetter,testRightLetter,dispenseDrops,evaluateResults,queueTestJob,clearCameraCalibrationPhotos, \
-    calibratePlunger
+    testLeftLetter,testRightLetter,dispenseDrops,evaluateResults,queueTestJob,clearCameraCalibrationPhotos \
+
     
 from Learn import learnFeature,testFeature
 
@@ -317,8 +317,6 @@ def parseCalibrate(tester,cmdOperation,cmdObject,cmdValue):
             snapCameraCalibrationPhoto(tester)
         elif cmdOperation=='Calibrate':
             generateCameraCalibrationModel(tester)
-        elif cmdOperation=='CalibPlunger':
-            calibratePlunger(tester)
         else:                     
             print('Unknown CALIBRATION operation: ' + cmdOperation)                   
     except:

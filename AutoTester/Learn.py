@@ -213,7 +213,7 @@ def testDlib(feat,image):
     img=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
     dets = feat.model(img)
     feat.boundingBoxList=[]
-    print("Number of targets detected: {}".format(len(dets)))
+#    print("Number of targets detected: {}".format(len(dets)))
     for k, d in enumerate(dets):
 #        print("Detection {}: Left: {} Top: {} Right: {} Bottom: {}".format(k, d.left(), d.top(), d.right(), d.bottom()))
 #        bbox=[d.left(),d.top(),d.right()-d.left(),d.bottom()-d.top()]

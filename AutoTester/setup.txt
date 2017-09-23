@@ -62,14 +62,23 @@ pip install schedule
 pip install joblib
 pip install rpi.gpio
 pip install requests
+pip install picamera
 
 Step 10. We need to copy in the autotester software.  This should be done within the virtual environment (cv)
 cd ~
 git clone https://github.com/percy9427/AutoTester.git
 
-From within the program: 
+To launch the program (this also needs to be done within the cv virtual environment).  If you see (cv) in the prompt then you are in the virtual environment.  Otherwise enter "workon cv"
+
 cd AutoTester/AutoTester
 python AutoTester.py
+
+or
+
+screen python AutoTester.py  (to have the program continue to run even after the SSH session is disconnected)
+
+After starting the program, you can access the controls on the web @ http://(IP address of the pi):8000
+It may take a few seconds for the webserver to load and start serving pages.
 
 
 

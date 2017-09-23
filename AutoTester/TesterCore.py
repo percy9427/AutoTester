@@ -89,6 +89,7 @@ class Tester:
 
     
     SET_HOME_POSITION=9999999
+    TIGHTEN_PAST_HOME_POSITION=9999998
     
     def __init__(self, id):
         self.id = id
@@ -179,8 +180,10 @@ class Tester:
         self.plungerState=self.PLUNGER_UNKNOWN
         self.plungerSlow=False
         self.plungerAbort=False  #Immediately stops the plunger.  Used when final drop is detected
+        self.valueForStopperWhenClosed=None
         self.previousLeftStopperPosition=None
         self.stopperMovement=None
+        self.carouselBaseLineImage=None
         self.carouselEnabled=False
         self.carouselDistanceFromOrigin=None
         self.carouselStepsPerRevolution=200*4*80/8 #Stepper Motor Steps, 1/4 steps, 80 tooth outer gear, 8 tooth inner gear
@@ -296,6 +299,7 @@ class Tester:
         self.reagentAlmostEmptyAlarmEnable=te.reagentAlmostEmptyAlarmEnable
         self.pauseInSecsBeforeEmptyingMixingChamber=te.pauseInSecsBeforeEmptyingMixingChamber
         self.iftttSecretKey=te.iftttSecretKey
+        self.stopperTighteningInMM=te.stopperTighteningInMM
         self.sendMeasurementReports=te.sendMeasurementReports
         self.enableConsoleOutput=te.enableConsoleOutput
         self.manageDatabases=te.manageDatabases
@@ -520,7 +524,7 @@ class Tester:
         
     def setCameraRotationMatrix(self,compensationDegrees,compensationScale,centerRow,centerCol):
         self.cameraCompensationTransformationMatrix = cv2.getRotationMatrix2D((centerRow,centerCol),compensationDegrees,compensationScale)                
-        print('Col: ' + str(centerCol) + ', Row: ' + str(centerRow))
+#        print('Col: ' + str(centerCol) + ', Row: ' + str(centerRow))
         
     def grabFrame(self):
         if not existsWebCam:
@@ -685,7 +689,10 @@ class Tester:
             self.plungerState=self.PLUNGER_FULLY_CLOSED
             self.plungerSteps=0
             return True
-        if self.plungerState==self.PLUNGER_FULLY_CLOSED and mm>0:
+        if mm==self.TIGHTEN_PAST_HOME_POSITION:
+            print('Tightening past home position')
+            mm=self.stopperTighteningInMM
+        elif self.plungerState==self.PLUNGER_FULLY_CLOSED and mm>0:
             print("Thinks is it already at top")
             return True   #already fully closed
         if not self.plungerEnabled:
@@ -729,6 +736,9 @@ class Tester:
                     self.plungerState=self.PLUNGER_OPEN
                 if self.plungerSteps<(-self.mmToRaiseFromOpenToFullyClosed-1)*self.plungerStepsPerMM:
                     self.plungerState=self.PLUNGER_PAST_OPEN 
+        if not self.plungerSteps is None:
+            if self.plungerSteps>0:
+                self.plungerSteps=0
         self.plungerStepping=False       
             
     def plungerDisable(self):
