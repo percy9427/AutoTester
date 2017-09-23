@@ -48,13 +48,13 @@ class feature:
         self.lastVisualState=None
         self.centerImage=False
         self.boundingBoxList=None
+        self.previousDarkPixelCount=None
         
     def setTesterClipFromFeature(self,tester):
-        distanceScaling=tester.avgDotDistance/self.learnedWithReferenceDistance
-        tester.featureWindowULRow=int(round(self.ulClipRowOffset*distanceScaling+tester.referenceCenterRow))
-        tester.featureWindowULCol=int(round(self.ulClipColOffset*distanceScaling+tester.referenceCenterCol))
-        tester.featureWindowLRRow=int(round(self.lrClipRowOffset*distanceScaling+tester.referenceCenterRow))
-        tester.featureWindowLRCol=int(round(self.lrClipColOffset*distanceScaling+tester.referenceCenterCol))
+        tester.featureWindowULRow=int(round(self.ulClipRowOffset+tester.referenceCenterRow))
+        tester.featureWindowULCol=int(round(self.ulClipColOffset+tester.referenceCenterCol))
+        tester.featureWindowLRRow=int(round(self.lrClipRowOffset+tester.referenceCenterRow))
+        tester.featureWindowLRCol=int(round(self.lrClipColOffset+tester.referenceCenterCol))
         tester.currentFeature=self
         tester.featureShow=True
         
@@ -66,11 +66,10 @@ class feature:
             rowShift=0
             colShift=0
 #        distanceScaling=tester.avgDotDistance/self.learnedWithReferenceDistance
-        distanceScaling=1.0
-        ulRow=int(round(self.ulClipRowOffset*distanceScaling+tester.referenceCenterRow))+rowShift
-        ulCol=int(round(self.ulClipColOffset*distanceScaling+tester.referenceCenterCol))+colShift
-        lrRow=int(round(self.lrClipRowOffset*distanceScaling+tester.referenceCenterRow))+rowShift
-        lrCol=int(round(self.lrClipColOffset*distanceScaling+tester.referenceCenterCol))+colShift
+        ulRow=int(round(self.ulClipRowOffset+tester.referenceCenterRow))+rowShift
+        ulCol=int(round(self.ulClipColOffset+tester.referenceCenterCol))+colShift
+        lrRow=int(round(self.lrClipRowOffset+tester.referenceCenterRow))+rowShift
+        lrCol=int(round(self.lrClipColOffset+tester.referenceCenterCol))+colShift
         box=image[ulRow:lrRow,ulCol:lrCol,:]
         return box
 
@@ -99,6 +98,63 @@ class feature:
         cv2.imwrite(fn,clipped)
         tester.debugMessage('Clipped image saved at: ' + fn)
     
+    def computeGapDarkness(self,image):
+        imageBW=255-cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+        bW01=cv2.normalize(imageBW.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+        rowSummation=np.sum(bW01,1)
+        firstDerivative=np.diff(rowSummation)
+        minValue=-999999
+        minIndex=None
+        rowIndex=0
+        for rowSum in rowSummation:
+            if rowSum>minValue:
+                minValue=rowSum
+                minIndex=rowIndex
+            rowIndex+=1
+        preceedingRow=minIndex-1
+        while preceedingRow>=0:
+            if firstDerivative[preceedingRow]<=1:
+                break
+            else:
+                preceedingRow-=1
+        followingRow=minIndex+1
+        while followingRow<len(firstDerivative):
+            if firstDerivative[followingRow]>=-1:
+                break
+            else:
+                followingRow+=1
+        baseIntensity=rowSummation[preceedingRow]*(followingRow-preceedingRow)
+        rowIndex=preceedingRow
+        intensity=0
+        while rowIndex<followingRow:
+            rowIntensity=rowSummation[rowIndex]-rowSummation[preceedingRow]
+            if rowIntensity>0:
+                intensity+=rowIntensity
+            rowIndex+=1
+        return intensity
+    
+    def getDarkPixelCount(self,image):
+        bwImage=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+        ret2,th2 = cv2.threshold(bwImage,100,255,cv2.THRESH_BINARY_INV)
+#        cv2.imshow("th2",th2)
+#        cv2.waitKey(0)
+        darkCount=np.sum(th2)
+        print(darkCount)
+        return darkCount
+    
+    def initiateDarkPixelCount(self):
+        self.previousDarkPixelCount=None
+        
+    def getDarkPixelChange(self,image):
+        latestDarkPixelCount=self.getDarkPixelCount(image)
+        if self.previousDarkPixelCount is None:
+            self.previousDarkPixelCount=latestDarkPixelCount
+            return latestDarkPixelCount,0
+        else:
+            delta=latestDarkPixelCount-self.previousDarkPixelCount
+            self.previousDarkPixelCount=latestDarkPixelCount
+            return latestDarkPixelCount,delta                    
+        
 class colorSheet:
     def __init__(self,name):
         self.colorSheetName=name

@@ -41,6 +41,7 @@ class TesterExternal(models.Model):
     sendMeasurementReports = models.BooleanField(default=False)
     currentTimeZone = models.CharField(max_length=50,default='US/Central',help_text="Enter your timezone from the list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones")
     enableConsoleOutput = models.BooleanField(default=False)
+    manageDatabases = models.BooleanField(default=False)
    
     def __str__(self):
         return self.testerName
@@ -53,6 +54,12 @@ class TesterProcessingParameters(models.Model):
     defaultReferenceCenterCol = models.FloatField(default=245)
     defaultAvgDotDistance = models.FloatField(default=95)
     skipOrientation = models.BooleanField(default=False)
+    maxImageScalingWithoutAdjustment=models.FloatField(default=1.05)
+    minImageScalingWithoutAdjustment=models.FloatField(default=.95)
+    maxImageRotationWithoutAdjustment=models.FloatField(default=2)
+    minImageRotationWithoutAdjustment=models.FloatField(default=-2)
+    defaultFisheyeExpansionFactor=models.FloatField(default=1.2)
+    gapTolerance=models.FloatField(default=5.0)
 
 class TestResultsExternal(models.Model):
     testPerformed = models.CharField(max_length=200, default=None, help_text="This was the test that was run")
@@ -173,6 +180,9 @@ class TesterFeatureExternal(models.Model):
     roiSideLength = models.IntegerField(default=65)
     cParmValue = models.IntegerField(default=8)
     upSampling = models.IntegerField(default=0)
+    dlibPositionRowOffset = models.IntegerField(default=0)
+    dlibPositionColOffset = models.IntegerField(default=0)
+    dlibUseRowPosition = models.BooleanField(default=True)
     positionCoefficientA = models.FloatField(default=1)
     positionCoefficientB = models.FloatField(default=0)
     confidenceThreshold = models.FloatField(default=1)
@@ -183,7 +193,13 @@ class TesterFeatureExternal(models.Model):
     
     class Meta:
         ordering = ['featureName']
+        
+class TesterStartupInfo(models.Model):
+    seatedGap = models.FloatField(default=2)
+    unseatedGap = models.FloatField(default=0)
 
+    def __str__(self):
+        return str(self.unseatedGap) + '/' + str(self.seatedGap)
     
 class LightingConditionsExternal(models.Model):
     lightingConditionName = models.CharField(max_length=40, default='LED',unique=True) 

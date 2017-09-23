@@ -242,7 +242,10 @@ def testDlibForHorizontalPosition(feat,image):
     return possibleHorizontalValues
     
 def testFeature(tester,feat,image):
-    if feat.model is None:
+    if feat.featureName=="Carousel Gap":
+        feat.lastVisualState=str(round(feat.computeGapDarkness(image),2))
+        return feat.lastVisualState
+    elif feat.model is None:
         print('No model for ' + feat.featureName)
         return None
     else:

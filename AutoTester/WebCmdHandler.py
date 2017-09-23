@@ -13,7 +13,8 @@ This module receives commands from the Web interface and executes them.
 
 from AutoTester import saveVideo,queuePlungerMove,queueCarouselMove,agitatorStart,agitatorStop,generateCameraCalibrationModel, \
     purgeLine,cleanMixer,fillMixingCylinder,runTestSequence,loadFeatureWindow,centerReagent,setPlungerToOpen,setPlungerToClosed, \
-    testLeftLetter,testRightLetter,dispenseDrops,evaluateResults,queueTestJob    # @UnresolvedImport
+    testLeftLetter,testRightLetter,dispenseDrops,evaluateResults,queueTestJob,clearCameraCalibrationPhotos, \
+    calibratePlunger
     
 from Learn import learnFeature,testFeature
 
@@ -66,9 +67,14 @@ def snapCameraCalibrationPhoto(tester):
 def testFeatureTraining(tester):
     tester.videoLowResCaptureLock.acquire()
     tester.videoLowResCaptureLock.wait()
-    currentFeat=tester.currentFeature.clipImage(tester,tester.latestLowResImage)
-    tester.videoLowResCaptureLock.release()
-    testFeature(tester,tester.currentFeature,currentFeat)
+    try:
+        currentFeat=tester.currentFeature.clipImage(tester,tester.latestLowResImage)
+        tester.videoLowResCaptureLock.release()
+        testFeature(tester,tester.currentFeature,currentFeat)
+    except:
+        tester.videoLowResCaptureLock.release()
+        print('Feature not set')
+        
 
 def generateTrainingSeries(tester):
     tester.carouselSeriesLock.acquire()
@@ -184,8 +190,8 @@ def parseControl(tester,cmdOperation,cmdObject,cmdValue):
             tester.featureStepSize=float(cmdObject)
             lowerPlunger(tester)
         elif cmdOperation=='MotorsOff':
-            tester.disablePlunger()
-            tester.disableCarousel()
+            tester.plungerDisable()
+            tester.carouselDisable()
             agitatorStop(tester)
             tester.turnPumpOff()
             tester.openMixerValve()
@@ -248,13 +254,17 @@ def parseDiagnostics(tester,cmdOperation,cmdObject,cmdValue):
     except:                  
         tester.debugLog.exception("Error in DIAGNOSTIC parsing")
                                    
-def parseTrain(tester,cmdOperation,cmdObject,cmdValue):
+def parseCalibrate(tester,cmdOperation,cmdObject,cmdValue):
     tester.showTraining=True
     try:
+        try:
+            tester.featureStepSize=int(cmdValue)
+        except:
+            pass
         if cmdOperation=='LoadFeat':
             tester.currentFeature=loadFeatureWindow(tester,cmdObject)
         elif cmdOperation=='SaveBox':
-            tester.currentFeature.saveClippingWindow(tester)
+            tester.currentFeature.saveFeatureWindow(tester)
         elif cmdOperation=='SnapFeat':
             tester.currentFeature.snapPhoto(tester)
         elif cmdOperation=='Learn':
@@ -285,34 +295,34 @@ def parseTrain(tester,cmdOperation,cmdObject,cmdValue):
             tester.undistortImage=False                       
         elif cmdOperation=="Undistort":
             tester.undistortImage=True
-        elif cmdOperation=='UL-Up':
-            if tester.clippingWindowULRow>tester.featureStepSize:
-                tester.clippingWindowULRow-=tester.featureStepSize
-        elif cmdOperation=='UL-Dn':
-            if tester.clippingWindowULRow+tester.featureStepSize<tester.clippingWindowLRRow:
-                tester.clippingWindowULRow+=tester.featureStepSize
-        elif cmdOperation=='UL-L':
-            if tester.clippingWindowULCol>tester.featureStepSize:
-                tester.clippingWindowULCol-=tester.featureStepSize
-        elif cmdOperation=='UL-R':
-            if tester.clippingWindowULCol+tester.featureStepSize<tester.clippingWindowLRCol:
-                tester.clippingWindowULCol+=tester.featureStepSize
-        elif cmdOperation=='LR-Up':
-            if tester.clippingWindowLRRow>tester.clippingWindowULRow+tester.featureStepSize:
-                tester.clippingWindowLRRow-=tester.featureStepSize
-        elif cmdOperation=='LR-Dn':
-            if tester.clippingWindowLRRow<tester.cameraHeightLowRes-tester.featureStepSize:
-                tester.clippingWindowLRRow+=tester.featureStepSize
-        elif cmdOperation=='LR-L':
-            if tester.clippingWindowLRCol>tester.clippingWindowULCol+tester.featureStepSize:
-                tester.clippingWindowLRCol-=tester.featureStepSize
-        elif cmdOperation=='LR-R':
-            if tester.clippingWindowLRCol<tester.cameraWidthLowRes-tester.featureStepSize:
-                tester.clippingWindowLRCol+=tester.featureStepSize
+        elif cmdOperation=='Feature-Up':
+            if tester.featureWindowULRow>tester.featureStepSize:
+                tester.featureWindowULRow-=tester.featureStepSize
+                tester.featureWindowLRRow-=tester.featureStepSize
+        elif cmdOperation=='Feature-Dn':
+            if tester.featureWindowLRRow<tester.cameraHeightLowRes-tester.featureStepSize:
+                tester.featureWindowLRRow+=tester.featureStepSize
+                tester.featureWindowULRow+=tester.featureStepSize
+        elif cmdOperation=='Feature-L':
+            if tester.featureWindowULCol>tester.featureStepSize:
+                tester.featureWindowULCol-=tester.featureStepSize
+                tester.featureWindowLRCol-=tester.featureStepSize
+        elif cmdOperation=='Feature-R':
+            if tester.featureWindowLRCol<tester.cameraWidthLowRes-tester.featureStepSize:
+                tester.featureWindowLRCol+=tester.featureStepSize
+                tester.featureWindowULCol+=tester.featureStepSize
+        elif cmdOperation=='ClearChecker':
+            clearCameraCalibrationPhotos(tester)
+        elif cmdOperation=='SnapChecker':
+            snapCameraCalibrationPhoto(tester)
+        elif cmdOperation=='Calibrate':
+            generateCameraCalibrationModel(tester)
+        elif cmdOperation=='CalibPlunger':
+            calibratePlunger(tester)
         else:                     
-            print('Unknown TRAIN operation: ' + cmdOperation)                   
+            print('Unknown CALIBRATION operation: ' + cmdOperation)                   
     except:
-        tester.debugLog.exception("Error in TRAIN parsing")
+        tester.debugLog.exception("Error in CALIBRATION parsing")
         
 def parseClickString(tester,cmdObject,cmdValue):
     #The Syntax of the click value string is:  'x-Coord,y-Coord,value
@@ -352,27 +362,6 @@ def parseSwatch(tester,cmdOperation,cmdObject,cmdValue):
             print('Unknown SWATCH operation: ' + cmdOperation)                               
     except:
         tester.debugLog.exception("Error in SWATCH parsing")
-
-def parseCalibrate(tester,cmdOperation,cmdObject,cmdValue):
-    try:
-        if cmdOperation=='LEDOn':
-            tester.turnLedOn()
-        if cmdOperation=='LEDOff':
-            tester.turnLedOff()
-        elif cmdOperation=='DotOn':
-            tester.displayDot=True
-        elif cmdOperation=='DotOff':
-            tester.displayDot=False
-        elif cmdOperation=='DotReload':
-            tester.loadColorsFromDB()
-        elif cmdOperation=='SnapCalib':
-            snapCameraCalibrationPhoto()
-        elif cmdOperation=='Calibrate':
-            generateCameraCalibrationModel(tester)
-        else:
-            print('Unknown CALIBRATION operation: ' + cmdOperation)                               
-    except:
-        tester.debugLog.exception("Error in CALIBRATION parsing")
 
 def parseOperate(tester,cmdOperation,cmdObject,cmdValue):
     try:
@@ -462,8 +451,6 @@ def processWebCommand(tester,commandString):
         pass
     if cmdCategory=='Home':
         parseHome(tester,cmdOperation,cmdObject,cmdValue)
-    if cmdCategory=='TRAIN':
-        parseTrain(tester,cmdOperation,cmdObject,cmdValue)
     elif cmdCategory=='OPERATE':
         parseOperate(tester,cmdOperation,cmdObject,cmdValue)
     elif cmdCategory=='CONTROL':

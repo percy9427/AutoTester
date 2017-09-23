@@ -130,6 +130,7 @@ class Tester:
         self.setTimeZone()
         self.loadTesterFromDB()
         self.loadProcessingParametersFromDB()
+        self.loadStartupParametersFromDB()
         self.testerLog=logging.getLogger('TesterLog')
         handler = RotatingFileHandler(self.basePath+ "Logs/tester.log", maxBytes=2000, backupCount=4)
         simpleFormatter = logging.Formatter('%(asctime)s - %(message)s')
@@ -156,6 +157,7 @@ class Tester:
         self.latestLowResImage=None
         self.streamVideo=True
         self.useImageForCalibration=False
+        self.cameraCompensationTransformationMatrix=None
         self.testerScheduleRegenerate=True
         self.extruderFound=False
         self.showTraining=False
@@ -170,6 +172,7 @@ class Tester:
         self.plungerStepsPerMM=200*2*34/12 #Stepper Motor Steps, 1/4 steps, 34 tooth outer gear, 12 tooth inner gear
         self.mmToRaiseFromOpenToFullyClosed=5
         self.plungerSteps=None
+        self.plungerStepping=False
         self.plungerMoving=False
         self.distanceToMovePlunger=None
         self.movePlungerLock=None
@@ -239,14 +242,15 @@ class Tester:
         
     def getCameraModel(self):
         self.cameraModelFile=self.basePath + '/Calibrate/FisheyeUndistort-(' + self.lensType + ',' + str(self.cameraHeightLowRes) + ' x ' + str(self.cameraWidthLowRes) + ')-' + sys.version[0] + '.pkl'
-        if os.path.isfile(self.cameraModelFile):
+        try:
             aggregateFishEyeModel=load_model(self.cameraModelFile)
             self.cameraFisheyeModel=aggregateFishEyeModel[0]
             self.cameraFisheyeExpansionFactor=aggregateFishEyeModel[1]
             self.infoMessage('Camera Model Loaded')
-        else:
+        except:
             self.cameraFisheyeModel=None
             self.infoMessage('Camera Model Not Found')
+            self.cameraFisheyeExpansionFactor=self.defaultFisheyeExpansionFactor
         
     def debugMessage(self,message):
         try:
@@ -294,6 +298,7 @@ class Tester:
         self.iftttSecretKey=te.iftttSecretKey
         self.sendMeasurementReports=te.sendMeasurementReports
         self.enableConsoleOutput=te.enableConsoleOutput
+        self.manageDatabases=te.manageDatabases
         
     def loadProcessingParametersFromDB(self):
         from tester.models import TesterProcessingParameters
@@ -302,8 +307,27 @@ class Tester:
         self.referenceCenterRow=tpp.defaultReferenceCenterRow
         self.referenceCenterCol=tpp.defaultReferenceCenterCol
         self.avgDotDistance=tpp.defaultAvgDotDistance
+        self.defaultDotDistance=tpp.defaultAvgDotDistance
         self.skipOrientation=tpp.skipOrientation
+        self.maxImageScalingWithoutAdjustment=tpp.maxImageScalingWithoutAdjustment
+        self.minImageScalingWithoutAdjustment=tpp.minImageScalingWithoutAdjustment
+        self.maxImageRotationWithoutAdjustment=tpp.maxImageRotationWithoutAdjustment
+        self.minImageRotationWithoutAdjustment=tpp.minImageRotationWithoutAdjustment
+        self.defaultFisheyeExpansionFactor=tpp.defaultFisheyeExpansionFactor
+        self.gapTolerance=tpp.gapTolerance
         
+    def loadStartupParametersFromDB(self):
+        from tester.models import TesterStartupInfo
+        tsi=TesterStartupInfo.objects.get(pk=1)
+        self.seatedGap=tsi.seatedGap
+        self.unseatedGap=tsi.unseatedGap
+        
+    def saveStartupParametersToDB(self):
+        from tester.models import TesterStartupInfo
+        tsi=TesterStartupInfo.objects.get(pk=1)
+        tsi.seatedGap=self.seatedGap
+        tsi.unseatedGap=self.unseatedGap
+        tsi.save()
         
     def loadFeaturesFromDB(self):
         from tester.models import TesterFeatureExternal
@@ -324,6 +348,9 @@ class Tester:
             feat.roiSideLength=fe.roiSideLength
             feat.cParmValue=fe.cParmValue
             feat.upSampling=fe.upSampling
+            feat.dlibPositionRowOffset=fe.dlibPositionRowOffset
+            feat.dlibPositionColOffset=fe.dlibPositionColOffset
+            feat.dlibUseRowPosition=fe.dlibUseRowPosition
             feat.positionCoefficientA=fe.positionCoefficientA
             feat.positionCoefficientB=fe.positionCoefficientB
             feat.confidenceThreshold=fe.confidenceThreshold
@@ -333,11 +360,15 @@ class Tester:
             
     def saveFeaturePosition(self,feat):                  
         from tester.models import TesterFeatureExternal
-        TesterFeatureExternal.objects.get(featureName=feat.featureName).update(ulClipRowOffset=feat.ulClipRowOffset,
-                                                                               ulClipColOffset=feat.ulClipColOffset,
-                                                                               lrClipRowOffset=feat.lrClipRowOffset,
-                                                                               lrClipColOffset=feat.lrClipColOffset,
-                                                                               learnedWithReferenceDistance=feat.learnedWithReferenceDistance)
+        testerToUpdate=TesterFeatureExternal.objects.get(featureName=feat.featureName)
+        testerToUpdate.ulClipRowOffset=round(feat.ulClipRowOffset)
+        testerToUpdate.ulClipColOffset=round(feat.ulClipColOffset)
+        testerToUpdate.lrClipRowOffset=round(feat.lrClipRowOffset)
+        testerToUpdate.lrClipColOffset=round(feat.lrClipColOffset)
+        testerToUpdate.dlibPositionRowOffset=feat.dlibPositionRowOffset
+        testerToUpdate.dlibPositionColOffset=feat.dlibPositionColOffset
+        testerToUpdate.learnedWithReferenceDistance=feat.learnedWithReferenceDistance
+        testerToUpdate.save()
         
     def loadTestDefinitionsFromDB(self):
         from tester.models import TestDefinition
@@ -487,6 +518,10 @@ class Tester:
         reagentObj.fluidRemainingInML=remainingML
         reagentObj.save()
         
+    def setCameraRotationMatrix(self,compensationDegrees,compensationScale,centerRow,centerCol):
+        self.cameraCompensationTransformationMatrix = cv2.getRotationMatrix2D((centerRow,centerCol),compensationDegrees,compensationScale)                
+        print('Col: ' + str(centerCol) + ', Row: ' + str(centerRow))
+        
     def grabFrame(self):
         if not existsWebCam:
             return False
@@ -501,7 +536,11 @@ class Tester:
                 lowResImage=frame.array
                 self.lowResArray.truncate(0)
                 if self.undistortImage: 
-                    rotLowResImage=self.imageUndistort(np.rot90(lowResImage))
+                    rot90image=np.rot90(lowResImage)
+                    if not self.cameraCompensationTransformationMatrix is None:
+                        width,height,channels=rot90image.shape
+                        rot90image = cv2.warpAffine(rot90image, self.cameraCompensationTransformationMatrix,(height,width),flags=cv2.INTER_LINEAR)                                            
+                    rotLowResImage=self.imageUndistort(rot90image)
                 else:    
                     rotLowResImage=np.rot90(lowResImage)
                 break
@@ -510,7 +549,10 @@ class Tester:
             return None,None
         
     def fakeFrame(self):  #Used for simulation on windows computer
-        simulationImageFN=self.basePath + 'Simulation/SimulationImage-' + str(self.cameraHeightLowRes) + 'x' + str(self.cameraWidthLowRes) + '.jpg'
+        if self.cameraType==self.CAMERATYPE_NONE:
+            simulationImageFN=self.basePath + 'Simulation/NoCameraImage-' + str(self.cameraHeightLowRes) + 'x' + str(self.cameraWidthLowRes) + '.jpg'
+        else:    
+            simulationImageFN=self.basePath + 'Simulation/SimulationImage-' + str(self.cameraHeightLowRes) + 'x' + str(self.cameraWidthLowRes) + '.jpg'
         simulationImage=cv2.imread(simulationImageFN)
         return simulationImage
         
@@ -524,9 +566,10 @@ class Tester:
             self.infoMessage('Camera type is picamera')
             return self.CAMERATYPE_PICAM
         except:
-            traceback.print_exc()
+#            traceback.print_exc()
             self.infoMessage('No camera found')
             self.systemStatus="Stopped - No Camera Found"
+            self.simulation=True
             return self.CAMERATYPE_NONE
             
     def webcamInitialize(self):
@@ -633,6 +676,8 @@ class Tester:
         return
     
     def movePlunger(self,mm,speed=None):
+        if self.simulation:
+            return
         if speed is None:
             speed=self.PLUNGER_HIGH_SPEED
         if mm==self.SET_HOME_POSITION:
@@ -661,8 +706,10 @@ class Tester:
         elif speed==self.PLUNGER_LOW_SPEED:
             stepDelay=.05            
         stepsToMove=int(abs(self.plungerStepsPerMM*mm))
+        self.plungerStepping=True
         while stepCountThisMove<stepsToMove:
             if self.plungerAbort:
+                self.plungerStepping=False
                 break
             GPIO.output(plungerStepGPIO,GPIO.HIGH)
             if self.plungerSlow:
@@ -681,7 +728,8 @@ class Tester:
                 if self.plungerSteps<-self.mmToRaiseFromOpenToFullyClosed*self.plungerStepsPerMM:
                     self.plungerState=self.PLUNGER_OPEN
                 if self.plungerSteps<(-self.mmToRaiseFromOpenToFullyClosed-1)*self.plungerStepsPerMM:
-                    self.plungerState=self.PLUNGER_PAST_OPEN        
+                    self.plungerState=self.PLUNGER_PAST_OPEN 
+        self.plungerStepping=False       
             
     def plungerDisable(self):
         if self.simulation:

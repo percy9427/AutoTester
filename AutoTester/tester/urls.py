@@ -26,7 +26,7 @@ urlpatterns = [
     #ex: /tester/control
     url(r'^control/?(?P<formResult>[\w-]*)$',views.control,name='control'),
     #ex: /tester/train
-    url(r'^train/?(?P<formResult>[\w-]*)$',views.train,name='train'),
+    url(r'^calibrate/?(?P<formResult>[\w-]*)$',views.calibrate,name='calibrate'),
     #ex: /tester/train
     url(r'^reagent/?(?P<formResult>[\w-]*)$',views.reagent,name='reagent'),
     #ex: /tester/train

@@ -217,19 +217,27 @@ def generateFeatureOptionsX(featureBeingUsed):
         return None  
 
 @login_required
-def train(request,formResult):
-    pageName='Feature Training'
+def calibrate(request,formResult):
+    pageName='Calibration'
     if request.method=='GET':
         jumpLoc=navigate(request) 
         if not jumpLoc is None:
             return redirect(jumpLoc)    
     streamingURL,imageWidth,imageHeight=getDisplayInfo(request)
     if request.method=='POST':
-        feat=None
-        cmd=request.POST['button']
-        feat=request.POST['toTrain']
-        lastStepSize=request.POST['stepSize']
-        sendCmdToTester('TRAIN/' + cmd + '/' + feat +'/' + lastStepSize)
+        try:
+            cmd=request.POST['button']
+        except:
+            cmd=""
+        try:
+            feat=request.POST['toTrain']
+        except:
+            feat=""
+        try:
+            lastStepSize=request.POST['stepSize']
+        except:
+            cmd=""
+        sendCmdToTester('CALIBRATE/' + cmd + '/' + feat +'/' + lastStepSize)
     else:
         feat=None
         lastStepSize='1'
@@ -237,7 +245,7 @@ def train(request,formResult):
     currentlySelected=feat
     stepSizeList=['1','5','10','30']
     context={'pageName':pageName,'streamingURL':streamingURL,'currentlySelected':currentlySelected,'featureList':featureList,'lastStepSize':lastStepSize,'stepSizeList':stepSizeList}
-    return render(request,'tester/train.html',context)
+    return render(request,'tester/calibrate.html',context)
 
 def createColorSheet(newColorSheetName):
     csNew=ColorSheetExternal()
@@ -611,7 +619,7 @@ def admin(request,formResult):
                 testerAdminForm=TesterForm(request.POST,instance=adminInfo)
                 partialdata=testerAdminForm.save(commit=False)
                 newKey=partialdata.iftttSecretKey
-                sendCmdToTester('ALARM/testIFTTT/' + newKey)
+                sendCmdToTester('ALARMS/testIFTTT/' + newKey)
                 messages.success(request,'Test Message Sent')
             except:
                 traceback.print_exc()

@@ -29,7 +29,6 @@ import schedule    # @UnresolvedImport
 import requests   # @UnresolvedImport
 import os
 import shutil
-import glob
 from FishEyeWrapper import FishEye
 from ImageCheck import matchMarkers,evaluateColor,findLightingEnvironment
 from Alarms import sendMeasurementReport,sendReagentAlarm,sendFillAlarm,sendDispenseAlarm,sendEvaluateAlarm,sendUnableToRotateAlarm,sendCannotOpenStoppersAlarm,sendCannotParkAlarm,sendOutOfLimitsAlarm,sendOutOfLimitsWarning
@@ -76,14 +75,14 @@ def generateWebLaunchFile(tester):
     launchFile=tester.basePath + "/launchWebServer.sh"
     launchText="#!/bin/bash\nexport WORKON_HOME=$HOME/.virtualenvs\nexport VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3\nsource /usr/local/bin/virtualenvwrapper.sh\nworkon "
     launchText = launchText + tester.virtualEnvironmentName + "\n"
-    launchText=launchText + tester.basePath + '/manage.py runserver 0.0.0.0:' + str(tester.webPort) + '\n'
+    launchText=launchText + 'python ' + tester.basePath + 'manage.py runserver 0.0.0.0:' + str(tester.webPort) + '\n'
     f=open(launchFile,"w+")
     f.write(launchText)
     f.close()
     
 def runWebServer(tester,name):
     from subprocess import call
-    generateWebLaunchFile(tester,"Joe")
+    generateWebLaunchFile(tester)
     call(["screen","-d","-m","-S",name,"bash", "launchWebServer.sh" ])   
 
 def sleepUntilNextInterval(lastTime,intervalInSeconds):
@@ -212,7 +211,7 @@ class TesterViewer(BaseHTTPRequestHandler):
                         if tester.seriesRunning:
                                     cv2.putText(imageCopy,'Series Running',(200,115), font, .75,(255,255,255),2,cv2.LINE_AA)                                
                         if tester.referenceMarkFound and tester.displayDot:
-                            cv2.line(imageCopy,(int(tester.avgSquareMarkerCol),int(tester.avgSquareMarkerRow)),(int(tester.avgCircleMarkerCol),int(tester.avgCircleMarkerRow)),(255,0,0),4)
+                            cv2.line(imageCopy,(int(tester.avgCircleLeftMarkerCol),int(tester.avgCircleLeftMarkerRow)),(int(tester.avgCircleRightMarkerCol),int(tester.avgCircleRightMarkerRow)),(255,0,0),4)
                         if tester.colorTable:
                             try:
                                 colorTable=tester.colorTable.generateColorTableDisplay(tester,width=tester.colorTable.tableWidth,height=tester.colorTable.tableRowHeight)
@@ -297,7 +296,7 @@ def captureImages():
                  
 def saveVideo(tester,duration=30):    
     startTime=datetime.datetime.now()
-    staticFilepath="/home/pi/Images"
+    staticFilepath=tester.basePath+"/Images"
     fileName=staticFilepath + '/Video-' + tester.testerName + '/Image-' + startTime.strftime("%Y-%m-%d %H-%M-%S") + '.avi'
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     rows,cols,colors=tester.latestLowResImage.shape
@@ -319,12 +318,26 @@ def saveVideo(tester,duration=30):
     out.release()
     tester.infoMessage(str(frameCount) + ' frames saved to ' + fileName)
 
+def clearCameraCalibrationPhotos(tester):
+    pathToCamerasCalibrationFolder=tester.basePath+'Calibrate'
+    pathToCalibrationImages=pathToCamerasCalibrationFolder + '/Samples'
+    calibrationPhotoList=os.listdir(pathToCalibrationImages)
+    count=0
+    for file in calibrationPhotoList:
+        os.remove(pathToCalibrationImages + '/' + file)
+        count+=1
+    tester.infoMessage(str(count) + ' files deleted from ' + pathToCalibrationImages)
+
 def checkerboardImageFisheyeCalibration(tester,pathToCamerasCalibrationFolder):
     #This loads the input images from the sample directory of the input
     NX=9
     NY=6
     pathToCalibrationImages=pathToCamerasCalibrationFolder + '/Samples'
-    imgs_paths = glob.glob(os.path.join(pathToCalibrationImages,'*Image-(' + tester.lensType + ',' + str(tester.cameraHeightLowRes) + ' x ' + str(tester.cameraWidthLowRes) + ')*.jpg'))
+    imgList = sorted(os.listdir(pathToCalibrationImages))
+    imgs_paths=[]
+    for fileName in imgList:
+        if useImageAsSample(tester,fileName):
+            imgs_paths.append(pathToCalibrationImages+'/'+fileName)
     fe = FishEye(nx=NX, ny=NY, verbose=True)
     tester.infoMessage('Fisheye calibration model created')
     rms, K, D, rvecs, tvecs = fe.calibrate(
@@ -334,24 +347,36 @@ def checkerboardImageFisheyeCalibration(tester,pathToCamerasCalibrationFolder):
     tester.infoMessage('Fisheye calibration model done')
     pathToCalibrationData=pathToCamerasCalibrationFolder + '/FisheyeUndistort-(' + tester.lensType + ',' + str(tester.cameraHeightLowRes) + ' x ' + str(tester.cameraWidthLowRes) + ')-' + sys.version[0] + '.pkl'
     with open(pathToCalibrationData, 'wb') as f:
-        _pickle.dump([fe,tester.fisheyeExpansionFactor], f)
+        _pickle.dump([fe,tester.cameraFisheyeExpansionFactor], f)
     
     pathToOutputData=pathToCamerasCalibrationFolder + '/UndistortedUsingFisheye'
     if not os.path.isdir(pathToOutputData):
         os.mkdir(pathToOutputData)
     
-    for filePath in imgs_paths:
-        img = cv2.imread(filePath)
-        height,width,colors=img.shape
-        Rmat=np.array([[1.,0.,0.],[0.,1.,0.],[0.,0.,tester.fisheyeExpansionFactor]])
-        undist_img = fe.undistort(img, undistorted_size=(width, height),R=Rmat)
-        outputPath=filePath.replace('Samples','UndistortedUsingFisheye')
-        tester.infoMessage('Writing undistorted image to ' + outputPath)
-        cv2.imwrite(outputPath,undist_img)
+    for fileName in imgList:
+        if useImageAsSample(tester,fileName):
+            img = cv2.imread(pathToCalibrationImages+'/'+fileName)
+            height,width,colors=img.shape
+            Rmat=np.array([[1.,0.,0.],[0.,1.,0.],[0.,0.,tester.cameraFisheyeExpansionFactor]])
+            undist_img = fe.undistort(img, undistorted_size=(width, height),R=Rmat)
+            outputPath=pathToCalibrationImages + '/UndistortedUsingFisheye/' + fileName
+            tester.infoMessage('Writing undistorted image to ' + outputPath)
+            cv2.imwrite(outputPath,undist_img)
     tester.infoMessage('Camera Calibration Done')
 
+def useImageAsSample(tester,filename):
+    index= filename.find('Image-(' + tester.lensType + ',' + str(tester.cameraHeightLowRes) + ' x ' + str(tester.cameraWidthLowRes) + ')')
+    if index>-1:
+        index=filename.find('.jpg')
+        if index>-1:
+            return True
+        else:
+            return False
+    else:
+        return False
+                             
 def generateCameraCalibrationModel(tester):
-    pathToCamerasCalibrationFolder='/home/pi/testerdata/Calibrate'
+    pathToCamerasCalibrationFolder=tester.basePath+'Calibrate'
     samplePath=pathToCamerasCalibrationFolder + '/Samples'
     try:
         tempDir1=pathToCamerasCalibrationFolder + '/TempSampleStorage1'
@@ -374,25 +399,23 @@ def generateCameraCalibrationModel(tester):
         pass
     pass
     pathToCalibrationImages=pathToCamerasCalibrationFolder + '/Samples'
-    imgs_paths = sorted(glob.glob(os.path.join(pathToCalibrationImages,'*Image-(' + tester.lensType + ',' + str(tester.cameraHeightLowRes) + ' x ' + str(tester.cameraWidthLowRes) + ')*.jpg')))
-    
+    imgList = sorted(os.listdir(pathToCalibrationImages))
     potentialSampleList=[]
-    for imagePath in imgs_paths:
-        pathParts=imagePath.split('/')
-        partCount=len(pathParts)
-        fileN=pathParts[partCount-1]
-        potentialSampleList.append(fileN)
-    for fileN in potentialSampleList:
-        shutil.move(samplePath + '/' + fileN, tempDir1 + '/' + fileN)
-    for fileN in potentialSampleList:
-        shutil.move(tempDir1 + '/' + fileN, samplePath + '/' + fileN)
-        try:
-            tester.infoMessage('Checking sample: ' + fileN)
-            checkerboardImageFisheyeCalibration(tester,pathToCamerasCalibrationFolder)
-            tester.infoMessage('Sample: ' + fileN + ' kept')
-        except:  
-            tester.infoMessage('Sample: ' + fileN + ' discarded')
-            shutil.move(samplePath + '/' + fileN, discardPath + '/' + fileN)
+    for fileN in imgList:
+        if useImageAsSample(tester,fileN):
+            potentialSampleList.append(fileN)
+        for fileN in potentialSampleList:
+            shutil.move(samplePath + '/' + fileN, tempDir1 + '/' + fileN)
+        for fileN in potentialSampleList:
+            shutil.move(tempDir1 + '/' + fileN, samplePath + '/' + fileN)
+            try:
+                tester.infoMessage('Checking sample: ' + fileN)
+                checkerboardImageFisheyeCalibration(tester,pathToCamerasCalibrationFolder)
+                tester.infoMessage('Sample: ' + fileN + ' kept')
+            except:
+                traceback.print_exc()  
+                tester.infoMessage('Sample: ' + fileN + ' discarded')
+                shutil.move(samplePath + '/' + fileN, discardPath + '/' + fileN)
     keptSampleList=sorted(os.listdir(tempDir2))
     for fileN in keptSampleList:
         shutil.move(tempDir2 + '/' + fileN, samplePath + '/' + fileN)
@@ -428,6 +451,7 @@ def queuePlungerMove(tester,distanceToMove,speed=None):
         tester.movePlungerLock.acquire()
         if tester.distanceToMovePlunger is None:
             tester.speedToMovePlunger=speed
+#            print('Queuer: Inserting ' + str(distanceToMove))
             tester.distanceToMovePlunger=distanceToMove
             tester.movePlungerLock.notify()
             tester.movePlungerLock.release()
@@ -438,7 +462,8 @@ def queuePlungerMove(tester,distanceToMove,speed=None):
             time.sleep(.5)
     return True
 
-def markPlungerAsClosed(tester):
+def markPlungerAsClosed(tester,origin=None):
+#    print('Close queued from ' + origin)
     return queuePlungerMove(tester,tester.SET_HOME_POSITION)
     
 def movePlungerProcess():
@@ -451,10 +476,17 @@ def movePlungerProcess():
         plungerMoveSpeed=tester.speedToMovePlunger
         if not plungerMoveDistance is None:
             tester.plungerMoving=True
+#            print('Dequeuer - move plunger: ' + str(plungerMoveDistance))
             tester.movePlunger(plungerMoveDistance,speed=plungerMoveSpeed)
+            tester.plungerMoving=False
         tester.distanceToMovePlunger=None
         tester.movePlungerLock.release()
         
+def waitUntilPlungerStopsMoving(tester):
+    while tester.plungerMoving or tester.plungerStepping:
+#        print('Waiting: carouselMoveQueued: ' + str(tester.carouselMoveQueued) + ', carouselStepping: ' + str(tester.carouselStepping))
+        time.sleep(.5)
+
 def queueCarouselMove(tester,distanceToMove):
     if not distanceToMove==tester.SET_HOME_POSITION:
         if tester.plungerState==tester.PLUNGER_FULLY_CLOSED or tester.plungerState==tester.PLUNGER_MOSTLY_CLOSED:
@@ -496,128 +528,71 @@ def moveCarouselProcess():
         tester.carouselMoveQueued=False
         tester.moveCarouselLock.release()
         
+def getPlungerCarouselGap(tester):
+    gapFeature=tester.featureList["Carousel Gap"]
+    tester.videoLowResCaptureLock.acquire()
+    tester.videoLowResCaptureLock.wait()
+    gapImage=gapFeature.clipImage(tester,tester.latestLowResImage)
+    tester.videoLowResCaptureLock.release()
+    gapScore=gapFeature.computeGapDarkness(gapImage)
+#    print('gapScore: ' + str(gapScore) + ', plungerMoving: ' + str(tester.plungerMoving) + ', plungerStepping: ' + str(tester.plungerStepping))
+    return gapScore  
+
+def calibratePlunger(tester): 
+    #This assumes that the plunger is set to closed position
+    gap=getPlungerCarouselGap(tester)
+    tester.seatedGap=round(gap,2)  
+    queuePlungerMove(tester,-5)  #Descend 5 mm
+    gap=getPlungerCarouselGap(tester)
+    tester.unSeatedGap=round(gap,2) 
+    tester.saveStartupParametersToDB()
+    setPlungerToClosed(tester)
+    tester.debugLog.info('Plunger Calibrated')
+    
+def initializePlungerPosition(tester):
+    gap=getPlungerCarouselGap(tester)
+    if gap>=(tester.seatedGap-tester.gapTolerance):
+        markPlungerAsClosed(tester,origin='1')
+        tester.debugLog.info('Plunger Marked As Closed')
+        return True
+    else:
+        setPlungerToClosed(tester)
+               
+def setPlungerToClosed(tester,runAsDiagnostic=False): 
+    gap=getPlungerCarouselGap(tester)
+    if gap>=(tester.seatedGap-tester.gapTolerance):
+        markPlungerAsClosed(tester,origin='2')
+        return True
+    else:
+        maxAscentSteps=1000
+        ascentStep=0
+        increment=.2
+        currentGap=getPlungerCarouselGap(tester)
+        while ascentStep<maxAscentSteps and currentGap<=(tester.seatedGap-tester.gapTolerance):
+            queuePlungerMove(tester,increment)
+#            time.sleep(1)
+            currentGap=getPlungerCarouselGap(tester)
+            ascentStep+=1
+        if ascentStep<maxAscentSteps:
+            if runAsDiagnostic:
+                tester.debugLog.info('Plunger Position Set to Closed')
+            markPlungerAsClosed(tester,origin='3')
+            return True
+        else:
+            tester.debugLog.info('Unable to Detect Plunger Closure.  Plunger May be Stuck')
+            return False
+        
 def setPlungerPosition(tester,desiredPosition=None,runAsDiagnostic=False):
     try:
         if desiredPosition==tester.PLUNGER_FULLY_CLOSED:
-            if tester.plungerState==tester.PLUNGER_FULLY_CLOSED:
-                markPlungerAsClosed(tester)
-                return True #Already fully closed
-            else:
-                visualPosition= testPlungerPosition(tester)
-                if visualPosition=='Open':
-                    maxRise=130
-                    stepsRaised=0
-                    while visualPosition=='Open' and stepsRaised<maxRise:
-#                        print('Raising 1 mm, Step Count: ' + str(stepsRaised))
-                        queuePlungerMove(tester,1)  #raise 1mm
-                        visualPosition= testPlungerPosition(tester)
-                        stepsRaised+=1
-                    if visualPosition=='Open':
-                        if runAsDiagnostic:
-                            tester.debugLog.info('Plunger never showed as closed')
-                        return False
-                    else:  #slowly lower until it shows as open again
-                        maxLower=10
-                        stepsLowered=0
-                        while visualPosition=='Closed' and stepsLowered<maxLower:
-#                            print('Lowering .5 mm, Step Count: ' + str(stepsLowered))
-                            queuePlungerMove(tester,-.5)  #lower .5mm
-#                            time.sleep(1)
-                            visualPosition= testPlungerPosition(tester)
-                            stepsLowered+=1
-                        if visualPosition=='Closed':
-                            if runAsDiagnostic:
-                                tester.debugLog.info('Plunger Would Not reopen')
-                            return False
-                        else:
-                            if runAsDiagnostic:
-                                tester.debugLog.info('Raising the stoppers to the top')
-                            queuePlungerMove(tester,tester.mmToRaiseFromOpenToFullyClosed)  #closeStopper
-                            time.sleep(1)
-                            markPlungerAsClosed(tester)
-                            if runAsDiagnostic:
-                                tester.debugLog.info('Stoppers Now Closed')
-                            return True
-                elif visualPosition=='Closed':
-                    maxLower=100
-                    stepsLowered=0
-                    while visualPosition=='Closed' and stepsLowered<maxLower:
-#                        print('Lowering .5 mm, Step Count: ' + str(stepsLowered))
-                        queuePlungerMove(tester,-.5)  #lower .5mm
-                        time.sleep(1)
-                        visualPosition= testPlungerPosition(tester)
-                        stepsLowered+=1
-                    if visualPosition=='Closed':
-                        if runAsDiagnostic:
-                            tester.debugLog.info('Plunger Would Not reopen')
-                        return False
-                    else:
-                        if runAsDiagnostic:
-                            tester.debugLog.info('Raising the stoppers to the top')
-                        queuePlungerMove(tester,tester.mmToRaiseFromOpenToFullyClosed)  #closeStopper
-                        time.sleep(1)
-                        markPlungerAsClosed(tester)
-                        if runAsDiagnostic:
-                            tester.debugLog.info('Stoppers Now Closed')
-                        return True                
-                else:
-                    if runAsDiagnostic:
-                        tester.debugLog.info('Cannot determine initial position of stopper')
-                    return False
+            setPlungerToClosed(tester,runAsDiagnostic=runAsDiagnostic)
+            tester.debugLog.info('Plunger Position Set to Closed')
+            return True
         elif desiredPosition==tester.PLUNGER_OPEN:
-            visualPosition= testPlungerPosition(tester)
-            if visualPosition=='Open':
-                maxRise=130
-                stepsRaised=0
-                while visualPosition=='Open' and stepsRaised<maxRise:
-#                    print('Raising 1 mm, Step Count: ' + str(stepsRaised))
-                    queuePlungerMove(tester,1)  #raise 1mm
-                    visualPosition= testPlungerPosition(tester)
-                    stepsRaised+=1
-                if visualPosition=='Open':
-                    if runAsDiagnostic:
-                        tester.debugLog.info('Plunger never showed as closed')
-                    return False
-                else:  #slowly lower until it shows as open again
-                    maxLower=10
-                    stepsLowered=0
-                    while visualPosition=='Closed' and stepsLowered<maxLower:
-#                        print('Lowering .5 mm, Step Count: ' + str(stepsLowered))
-                        queuePlungerMove(tester,-.5)  #lower .5mm
-                        time.sleep(1)
-                        visualPosition= testPlungerPosition(tester)
-                        stepsLowered+=1
-                    if visualPosition=='Closed':
-                        if runAsDiagnostic:
-                            tester.debugLog.info('Plunger Would Not reopen')
-                        return False
-                    else:
-                        tester.plungerState=tester.PLUNGER_OPEN
-                        if runAsDiagnostic:
-                            tester.debugLog.info('Stoppers Now Open')
-                        return True
-            elif visualPosition=='Closed':
-                maxLower=100
-                stepsLowered=0
-                while visualPosition=='Closed' and stepsLowered<maxLower:
-#                    print('Lowering .5 mm, Step Count: ' + str(stepsLowered))
-                    queuePlungerMove(tester,-.5)  #lower .5mm
-                    time.sleep(1)
-                    visualPosition= testPlungerPosition(tester)
-                    stepsLowered+=1
-                if visualPosition=='Closed':
-                    if runAsDiagnostic:
-                        tester.debugLog.info('Plunger Would Not reopen')
-                    return False
-                else:
-                    tester.plungerState=tester.PLUNGER_OPEN
-                    if runAsDiagnostic:
-                        tester.debugLog.info('Stoppers Now Open')
-                    return True
-            else:
-                if runAsDiagnostic:
-                    tester.debugLog.info('Cannot determine initial position of stopper')
-                return False
+            setPlungerToClosed(tester,runAsDiagnostic=runAsDiagnostic)
+            queuePlungerMove(tester,-tester.mmToRaiseFromOpenToFullyClosed-1)  #lower 5 mm from raised position
+            tester.debugLog.info('Plunger Position Set to Open')
+            return True
         else:
             if runAsDiagnostic:
                 tester.debugLog.info('Desired position must be either open or closed')
@@ -626,23 +601,20 @@ def setPlungerPosition(tester,desiredPosition=None,runAsDiagnostic=False):
         if runAsDiagnostic:
             tester.debugLog.info("Plunger Seating Failure")
         tester.debugLog.exception("Plunger Seating Failure")
-
-def setPlungerToClosed(tester,runAsDiagnostic=False):
-    return setPlungerPosition(tester,desiredPosition=tester.PLUNGER_FULLY_CLOSED,runAsDiagnostic=runAsDiagnostic)
+        return False
 
 def setPlungerToOpen(tester,runAsDiagnostic=False):
     return setPlungerPosition(tester,desiredPosition=tester.PLUNGER_OPEN,runAsDiagnostic=runAsDiagnostic)    
 
 def testPlungerPosition(tester,detectMotion=False):
-    tester.videoLowResCaptureLock.acquire()
-    tester.videoLowResCaptureLock.wait()
-    featureToUse=tester.featureList["LeftStopper"]
-    currentFeature=featureToUse.clipImage(tester,tester.latestLowResImage)
-    tester.videoLowResCaptureLock.release()
-    visualPosition=testFeature(tester,featureToUse,currentFeature)
-#    print('Visual: ' + visualPosition)
-    return visualPosition
-
+    gap=getPlungerCarouselGap(tester)
+    if gap>tester.unseatedGap:
+        print('Closed')
+        return 'Closed'
+    else:
+        print('Open')
+        return 'Open'
+    
 def testReagentPosition(tester,precise=False):
     waitUntilCarouselStopsMoving(tester)
     if precise:
@@ -664,6 +636,7 @@ def testReagentPosition(tester,precise=False):
             if abs(result)<abs(minResult):
                 minResult=result
         return minResult
+    
         
 def centerReagent(tester,precise=False):
     maxSteps=50
@@ -692,6 +665,9 @@ def centerReagent(tester,precise=False):
                 if abs(currOffset)<=minAlignmentPrecise and previousBePrecise:
                     return True
                 else:
+                    distToMove=currOffset/(360*4)
+                    if abs(distToMove<minAlignmentPrecise):
+                        return True
                     print('Step: ' + str(currStep) + ', Precise3: ' + str(bePrecise) + ' - Queue: ' + str(currOffset/(360*4)))
                     queueCarouselMove(tester,currOffset/(360*4))
                     previousBePrecise= bePrecise
@@ -970,6 +946,8 @@ def testRotation(tester,numOfDestinations):
     testNum=0
     successCount=0
     failureCount=0
+    setPlungerToOpen(tester,runAsDiagnostic=True)
+    waitUntilPlungerStopsMoving(tester)
     while testNum<numOfDestinations:
         randomDest=random.randint(0,11)
         dest=destinationLetters[randomDest]
@@ -989,8 +967,11 @@ def testPlunger(tester,numCycles):
     successCount=0
     failureCount=0
     while testNum<numCycles:
+        waitUntilPlungerStopsMoving(tester)
         result=setPlungerToOpen(tester,runAsDiagnostic=True)
         if result:
+            time.sleep(3)
+            waitUntilPlungerStopsMoving(tester)
             result=setPlungerToClosed(tester,runAsDiagnostic=True)
             if result:
                 successCount+=1
@@ -1126,14 +1107,43 @@ def seriesCapture():
                 tester.openMixerValve()
                 time.sleep(2)
                 numRefills+=1
+        elif tester.currentFeature.featureName=="Left Stopper" or tester.currentFeature.featureName=="Right Stopper":
+            upDownCycleCount=10
+            minDepth=2
+            maxDepth=-10
+            cycleCount=0
+            increment=.2
+            while cycleCount<upDownCycleCount:
+                print('Iteration: ' + str(cycleCount+1))
+                currentPlungerLevel=0 
+                while currentPlungerLevel> maxDepth:              
+                    print('Descending - Depth: ' + str(currentPlungerLevel))
+                    queuePlungerMove(tester,-increment)
+                    time.sleep(1)
+                    currentPlungerLevel+=-increment
+                    feat.snapPhoto(tester)
+                seatedGap=getPlungerCarouselGap(tester)
+                currentGap=seatedGap
+                while currentPlungerLevel<minDepth and currentGap<seatedGap+1:
+                    print('Ascending - Depth: ' + str(currentPlungerLevel) + ', Gap: ' + str(currentGap))
+                    queuePlungerMove(tester,increment)
+                    time.sleep(1)
+                    currentPlungerLevel+=increment
+                    feat.snapPhoto(tester)
+                    currentGap=getPlungerCarouselGap(tester)
+                if currentPlungerLevel<minDepth:
+                    print('Cycle complete - stopped due to gap increase')
+                else:
+                    print('Cycle complete - stopped due to max height')
+                cycleCount+=1
             
 def findReferenceDots():   
     orientationDotSamples=0
-    totalSquareX=0
-    totalSquareY=0
+    totalCircleXLeft=0
+    totalCircleYLeft=0
     totalSquareSamples=0
-    totalCircleX=0
-    totalCircleY=0
+    totalCircleXRight=0
+    totalCircleYRight=0
     totalCircleSamples=0
     samplesNeeded=10
     maxDotHeightDiscrepancy=4
@@ -1144,32 +1154,44 @@ def findReferenceDots():
             tester.videoLowResCaptureLock.wait()
             imageCopy=tester.latestLowResImage.copy()
             tester.videoLowResCaptureLock.release()
-            squareX,squareY,circleX,circleY=matchMarkers(imageCopy,tester)
-            if not squareX is None:
-                totalSquareX+=squareX
-                totalSquareY+=squareY
+            circleXLeft,circleYLeft,circleXRight,circleYRight=matchMarkers(imageCopy,tester)
+            if not circleXLeft is None:
+                totalCircleXLeft+=circleXLeft
+                totalCircleYLeft+=circleYLeft
                 totalSquareSamples+=1
-            if not circleX is None:
-                totalCircleX+=circleX
-                totalCircleY+=circleY
+            if not circleXRight is None:
+                totalCircleXRight+=circleXRight
+                totalCircleYRight+=circleYRight
                 totalCircleSamples+=1
-        tester.avgSquareMarkerRow=totalSquareY/totalSquareSamples
-        tester.avgSquareMarkerCol=totalSquareX/totalSquareSamples
-        tester.avgCircleMarkerRow=totalCircleY/totalCircleSamples
-        tester.avgCircleMarkerCol=totalCircleX/totalCircleSamples
-        tester.avgDotDistance=tester.avgCircleMarkerCol-tester.avgSquareMarkerCol
-        heightDist=abs(tester.avgCircleMarkerRow-tester.avgSquareMarkerRow)
-        if heightDist>maxDotHeightDiscrepancy:
-            tester.infoMessage('Orientation aborted because of dot height mismatch: Square: (' + str(round(tester.avgSquareMarkerCol,2)) + 
-                        ',' + str(round(tester.avgSquareMarkerRow,2)) + '), Circle: (' + str(round(tester.avgCircleMarkerCol,2)) + 
-                        ',' + str(round(tester.avgCircleMarkerRow,2)) + ')')
+        tester.avgCircleLeftMarkerRow=totalCircleYLeft/totalSquareSamples
+        tester.avgCircleLeftMarkerCol=totalCircleXLeft/totalSquareSamples
+        tester.avgCircleRightMarkerRow=totalCircleYRight/totalCircleSamples
+        tester.avgCircleRightMarkerCol=totalCircleXRight/totalCircleSamples
+        tester.avgDotDistance=tester.avgCircleRightMarkerCol-tester.avgCircleLeftMarkerCol
+        heightDist=tester.avgCircleRightMarkerRow-tester.avgCircleLeftMarkerRow
+        tester.infoMessage('Dot height difference: ' + str(heightDist))
+        tester.infoMessage('Dot Separation:' + str(tester.avgDotDistance))
+        if abs(heightDist)>maxDotHeightDiscrepancy:
+            tester.infoMessage('Orientation aborted because of dot height mismatch: Left Circle: (' + str(round(tester.avgCircleLeftMarkerCol,2)) + 
+                        ',' + str(round(tester.avgCircleLeftMarkerRow,2)) + '), Right Circle: (' + str(round(tester.avgCircleRightMarkerCol,2)) + 
+                        ',' + str(round(tester.avgCircleRightMarkerRow,2)) + ')')
             return False
         else:
-            tester.referenceCenterRow=(tester.avgSquareMarkerRow+tester.avgCircleMarkerRow)/2
-            tester.referenceCenterCol=(tester.avgSquareMarkerCol+tester.avgCircleMarkerCol)/2
+            tester.referenceCenterRow=(tester.avgCircleLeftMarkerRow+tester.avgCircleRightMarkerRow)/2
+            tester.referenceCenterCol=(tester.avgCircleLeftMarkerCol+tester.avgCircleRightMarkerCol)/2
             tester.referenceMarkFound=True
             tester.infoMessage('Reference Dots Found - Row Center: ' + str(tester.referenceCenterRow) + ', Col Center: ' + str(tester.referenceCenterCol) + ', distance: ' + str(tester.avgDotDistance))
+            degreesToCompensate=math.degrees(math.atan(heightDist/tester.avgDotDistance))
+            tester.infoMessage('Image compensation angle: ' + str(degreesToCompensate))
+            imageScalingFactor=tester.defaultDotDistance/tester.avgDotDistance
+            tester.infoMessage('Image Scaling Factor: ' + str(imageScalingFactor))
+            if imageScalingFactor>tester.maxImageScalingWithoutAdjustment or imageScalingFactor<tester.maxImageScalingWithoutAdjustment or degreesToCompensate>tester.maxImageRotationWithoutAdjustment or degreesToCompensate<tester.minImageRotationWithoutAdjustment:
+                tester.infoMessage('Images will be adjusted using compensation factors')
+                tester.setCameraRotationMatrix(degreesToCompensate,imageScalingFactor,int(tester.referenceCenterRow),int(tester.referenceCenterCol))
+            else:
+                tester.infoMessage('Images within tolerance, so no image rotation or scaling applied')
             return True
+
     except:
         tester.debugLog.exception("Unable to Find Reference Dots")
         tester.systemStatus='Error - Cannot find Reference Dots'
@@ -1184,7 +1206,7 @@ def parkTester(tester):
             if leftLetterPos=='A':
                 rightLetterPos=testRightLetter(tester)
                 if rightLetterPos=='B':
-                    markPlungerAsClosed(tester)
+                    markPlungerAsClosed(tester,origin='4')
                     markCarouselAsAtOrigin(tester)
                     tester.parked=True
                     print('Orientation Complete - already in parked position')
@@ -1197,7 +1219,7 @@ def parkTester(tester):
             if result:
                 while tester.plungerSteps is None:
                     print('Plunger steps still none')
-                    markPlungerAsClosed(tester)
+                    markPlungerAsClosed(tester,origin='6')
                 tester.parked=True
                 print('Parking Complete - now in parked position')
                 return True
@@ -1224,6 +1246,8 @@ def orientTester():
     findLightingEnvironment(tester)
     while not tester.referenceMarkFound:
         findReferenceDots()
+#    initializePlungerPosition(tester)
+#    print('Plunger init complete')
     nozzlePos=testPlungerPosition(tester)
     if nozzlePos=="Closed":
         centeredStatus=testReagentPosition(tester)
@@ -1232,21 +1256,24 @@ def orientTester():
             if leftLetterPos=='A':
                 rightLetterPos=testRightLetter(tester)
                 if rightLetterPos=='B':
-                    markPlungerAsClosed(tester)
+                    markPlungerAsClosed(tester,origin='7')
                     markCarouselAsAtOrigin(tester)
                     tester.parked=True
                     tester.systemStatus="Idle"
                     tester.infoMessage('Orientation Complete - already in parked position')
                     return True
+    waitUntilPlungerStopsMoving(tester)
+    print('Orientation - wasnt all setup')
     result=setPlungerPosition(tester,desiredPosition=tester.PLUNGER_OPEN)
     if result:
+        waitUntilPlungerStopsMoving(tester)
         result=rotateToPosition(tester,'A',precise=True)
         if result:
             result=setPlungerPosition(tester,desiredPosition=tester.PLUNGER_FULLY_CLOSED)
             if result:
                 while tester.plungerSteps is None:
                     print('Plunger steps still none')
-                    markPlungerAsClosed(tester)
+                    markPlungerAsClosed(tester,origin='8')
                 tester.parked=True
                 tester.systemStatus="Idle"
                 tester.infoMessage('Orientation Complete - now in parked position')
@@ -1731,13 +1758,27 @@ if __name__ == '__main__':
     os.environ['DJANGO_SETTINGS_MODULE'] = 'AutoTesterv2.settings'
     django.setup()
     tester=Tester(1)
+    if tester.manageDatabases:
+        adminToUse=tester.basePath + 'tester/databaseAdminFull.py'
+    else:
+        adminToUse=tester.basePath + 'tester/databaseAdminEmpty.py'
+    adminToReplace=tester.basePath + 'tester/databaseAdmin.py'
+    try:
+        fin=open(adminToUse,'r')
+        text=fin.read()
+        fin.close()
+        fout=open(adminToReplace,'w+')
+        fout.write(text)
+        fout.close()
+    except:
+        tester.infoMessage('Admin update failed')
     testerWebName='TesterWeb'
     if platform.system()!='Windows':
         if screenPresent(testerWebName):
             tester.infoMessage('Web port already active, so not relaunched')
         else:
             tester.infoMessage('Web port not active, so launching webserver')
-            runWebserver(tester,testerWebName)
+            runWebServer(tester,testerWebName)
     tester.videoLowResCaptureLock=threading.Condition()
     tester.captureImageLock=threading.Condition()
     tester.movePlungerLock=threading.Condition()

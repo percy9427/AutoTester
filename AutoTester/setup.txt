@@ -5,7 +5,7 @@ a headless install (meaning you don't need to connect the Raspberry Pi to a moni
 
 Step 1. Download a fresh image of Raspian Stretch Lite from here: https://www.raspberrypi.org/downloads/raspbian/
 
-Step 2. Install it onto a microSD card (8GB should be sufficient) according to the instructions here: https://www.raspberrypi.org/documentation/installation/installing-images/README.md
+Step 2. Install it onto a microSD card (Even the Stretch lite version has software bloat so you probably need 16GB) according to the instructions here: https://www.raspberrypi.org/documentation/installation/installing-images/README.md
 
 Step 3. Once the Raspian image has been written onto the SD card, you need to set it up so it can be accessed externally.
 For this you need to do two things: enable ssh so you can control it remotely, and enable wifi (unless you prefer ethernet)
@@ -34,34 +34,36 @@ Step 6. Use the raspi-config program to set up options (sudo raspi-config).  The
  - Expanding the File System (Menu item 7)
 Reboot afterwards
 
-Step 7. One of the biggest dependencies we have is the computer vision library OpenCV.  Unfortuantely, 
-appropriate versions of the libraries are not available, so we need to compile it.  
-The steps to do this are here: http://www.pyimagesearch.com/2017/09/04/raspbian-stretch-install-opencv-3-python-on-your-raspberry-pi/
-Start with step #2 of the guide and setup the virtual environment using Python3.  Name the virtual environment "cv" as in the guide.
-This is the longest step of the install process.  Note that in setting up the virtual environment where you append the virtualenv path
-to the ~/.profile file, I needed to add the line: "export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3" before "source /usr/local/bin/virtualenvwrapper.sh".
-
-Step 8. We need to increase the swap size to install the following packages which seem to require lots of memory:
+Step 7. We need to increase the swap size to install the following packages which seem to require lots of memory:
 sudo nano /etc/dphys-swapfile
 change to CONF_SWAPSIZE=2048 and then reboot
 
-Step 9. We need to install more computer vision and machine learning libraries.  These are simpler to install, but also take a long time to install.
-Make sure you are within the cv virtual environment when running these steps.
-sudo apt-get install libboost-all-dev -y
-sudo pip install numpy
-sudo pip install dlib
-sudo pip3 install scipy -v
-sudo pip install scikit-learn -v
-sudo pip install scikit-image -v
+Step 8. One of the biggest dependencies we have is the computer vision library OpenCV.  Unfortuantely, 
+appropriate versions of the libraries are not available, so we need to compile it.  
+The steps to do this are here: http://www.pyimagesearch.com/2017/09/04/raspbian-stretch-install-opencv-3-python-on-your-raspberry-pi/
+Start with step #2 of the guide and setup the virtual environment using Python3.  Name the virtual environment "cv" as in the guide.
+This is the longest step of the install process.  A couple of notes to help the process along.  Since, you increased the swap size in step 7,
+you can perform the make using 4 cores (make -j4 instead of just make).  This speeds up the proces.  Also, in setting up the virtual environment 
+where you append the virtualenv path to the ~/.profile file, Add the line: "export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3" before
+"source /usr/local/bin/virtualenvwrapper.sh".
 
-Step 10. Then there are a lot of other dependencies. These should all be installed within the virtual environment (cv) created in step 7.
+Step 9. We need to install more computer vision, machine learning, and miscellaneous libraries.  These are simpler to install, but also take a long time to install.
+Make sure you are within the cv virtual environment created above.
+sudo apt-get install libboost-all-dev -y
+pip install dlib
+pip install scipy -v
+pip install scikit-learn -v
+pip install scikit-image -v
 sudo apt-get install screen -y
 sudo apt-get install git -y
-sudo pip install django
-sudo pip install rpyc
-sudo pip install schedule
+pip install django
+pip install rpyc
+pip install schedule
+pip install joblib
+pip install rpi.gpio
+pip install requests
 
-Step 11. We need to copy in the autotester software.  This should be done within the virtual environment (cv)
+Step 10. We need to copy in the autotester software.  This should be done within the virtual environment (cv)
 cd ~
 git clone 
 
