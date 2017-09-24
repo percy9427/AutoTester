@@ -156,6 +156,129 @@ class feature:
             self.previousDarkPixelCount=latestDarkPixelCount
             return latestDarkPixelCount,delta                    
         
+    def getMixerLevelBasedOnDifference(self,image):
+        try:
+            if not self.featureName == "MixerLevel":
+                return False
+            subtractionImage=cv2.absdiff(image,self.referenceClip)
+            imageBW=cv2.cvtColor(subtractionImage,cv2.COLOR_BGR2GRAY)
+            bW01=cv2.normalize(imageBW.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+            ret2,th2 = cv2.threshold(imageBW,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            mixerCol=np.sum(th2,1)
+            mixerSum=np.sum(mixerCol)
+            weightedCol=mixerCol/mixerSum
+            numRows=len(mixerCol)
+            mixerHeight=range(numRows)
+            heightArray=np.asarray(mixerHeight)
+            centroidHeight=np.inner(weightedCol,heightArray)
+            #Test 1 - Is the centroid below the center?
+            if centroidHeight<=(numRows/2-20):
+                return 0
+            im2, contours, hierarchy = cv2.findContours(th2,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+            maxArea=0
+            secondToMaxArea=0
+            maxContour=None
+            secondToMaxContour=None
+            #Get the 2 biggest contours
+            for contour in contours:
+                area=cv2.contourArea(contour)
+                if area>maxArea:
+                    secondToMaxArea=maxArea
+                    secondToMaxContour=maxContour
+                    maxArea=area
+                    maxContour=contour
+                elif area>secondToMaxArea:
+                    secondToMaxArea=area
+                    secondToMaxContour=contour
+            x1,y1,w1,h1 = cv2.boundingRect(maxContour)
+            maxRect=w1*h1    
+            x2,y2,w2,h2 = cv2.boundingRect(secondToMaxContour)
+            secondToMaxRect=w2*h2    
+            #Test 2 - Does one of the two biggest centroids extend to the bottom:
+            if y1+h1>=numRows-1:
+        #        print('Max Contour extends to bottom')
+                bottomContour=maxContour
+                bottomX=x1
+                bottomY=y1
+                bottomH=h1
+                bottomW=w1
+                topContour=secondToMaxContour
+                topX=x2
+                topY=y2
+                topH=h2
+                topW=w2
+            elif y2+h2>=numRows-1:
+        #        print('Second to Max Contour extends to bottom')
+                bottomContour=secondToMaxContour
+                bottomX=x2
+                bottomY=y2
+                bottomH=h2
+                bottomW=w2
+                topContour=maxContour
+                topX=x1
+                topY=y1
+                topH=h1
+                topW=w1
+            else:
+                return 0 #Neither conntour goes to the bottom
+            minimumWidth=20
+            #Test 3 - Is the bottom box wide enough:
+            if bottomW<minimumWidth:
+                return 0
+            addTopContour=True
+            if topW<minimumWidth:
+                addTopContour=False
+            #Test 4 does top contour abut lower contour
+            maxTopToBottomSkew=2
+            if abs((topY+topH)-bottomY)>maxTopToBottomSkew:
+                addTopContour=False
+            #Test 5 is the horizontal center of the top contour near the center of the bottom contour
+            maxSideToSideSkew=4
+            if abs((topX+topW/2)-(bottomX+bottomW/2))>maxSideToSideSkew:
+                addTopContour=False            
+            if addTopContour:
+                pixelHeight=topY
+            else:
+                pixelHeight=bottomY
+            ml=self.positionCoefficientA*pixelHeight+self.positionCoefficientB
+            return ml
+        except:
+            traceback.print_exc()
+            return 0
+
+    def isMixerOverflowing(self,image):
+        if not self.featureName == "MixerOverflow":
+            return False
+        subtractionImage=cv2.absdiff(image,self.referenceClip)
+        imageBW=cv2.cvtColor(subtractionImage,cv2.COLOR_BGR2GRAY)
+        bW01=cv2.normalize(imageBW.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+        ret2,th2 = cv2.threshold(imageBW,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        mixerCol=np.sum(th2,1)
+        mixerSum=np.sum(mixerCol)
+        weightedCol=mixerCol/mixerSum
+        numRows=len(mixerCol)
+        mixerHeight=range(numRows)
+        heightArray=np.asarray(mixerHeight)
+        centroidHeight=np.inner(weightedCol,heightArray)
+        #Test 1 - Is the centroid below the center?
+        if centroidHeight<=(numRows/2):
+            return False
+        im2, contours, hierarchy = cv2.findContours(th2,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        maxAreaWideRectangle=0
+        maxContourWideRectangle=None
+        #Get the biggest contours
+        for contour in contours:
+            minWidth=20
+            minWidthToHeightRatio=2
+            area=cv2.contourArea(contour)
+            x1,y1,w1,h1 = cv2.boundingRect(contour)
+            if area>maxAreaWideRectangle and w1>=minWidth and w1/h1>=minWidthToHeightRatio:
+                maxAreaWideRectangle=area
+                maxContourWideRectangle=contour
+        if maxContourWideRectangle is None:
+            return False
+        return True
+
 class colorSheet:
     def __init__(self,name):
         self.colorSheetName=name

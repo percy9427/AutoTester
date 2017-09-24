@@ -249,6 +249,8 @@ def parseDiagnostics(tester,cmdOperation,cmdObject,cmdValue):
             queueDiagnosticTest(tester,cmdOperation,5)                   
         elif cmdOperation=='Dispense Diagnostic':
             queueDiagnosticTest(tester,cmdOperation,5)                   
+        elif cmdOperation=='Fill Mixer Diagnostic':
+            queueDiagnosticTest(tester,cmdOperation,5)                   
         else:
             print('Unknown DIAGNOSTIC operation: ' + cmdOperation)
     except:                  

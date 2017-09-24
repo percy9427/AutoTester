@@ -1037,6 +1037,28 @@ def testDispensing(tester,numCycles):
         testNum+=1
     tester.debugLog.info('All test cycles completed. Success: ' + str(successCount) + ', Failures: ' + str(failureCount))            
         
+def testFillingMixer(tester):
+    randomLevel=random.randint(4,10)
+    tester.debugLog.info('Test filling mixer to level: ' + str(randomLevel))
+    result=fillMixingCylinder(tester,vol=randomLevel,runAsDiagnostic=True)
+    return result
+
+def testMixerFill(tester,numCycles):
+    testNum=0
+    successCount=0
+    failureCount=0
+    while testNum<numCycles:
+        result=testFillingMixer(tester)
+        if result:
+            tester.debugLog.info('Cycle completion: Success')
+            successCount+=1
+        else:
+            tester.debugLog.info('Cycle completion: Failed')
+            failureCount+=1
+        testNum+=1
+    tester.openMixerValve()
+    tester.debugLog.info('All test cycles completed. Success: ' + str(successCount) + ', Failures: ' + str(failureCount))            
+        
 def seriesCapture():
     while True:
         angle=0
@@ -1045,9 +1067,13 @@ def seriesCapture():
         tester.carouselSeriesLock.wait()
         tester.seriesRunning=True
         feat=tester.currentFeature
+        tester.infoMessage('Starting Series Sample Generation for Feature: ' + feat.featureName)
+        featureImageDirectory=tester.basePath + 'Images/' + feat.featureName
+        if not os.path.isdir(featureImageDirectory):
+            os.mkdir(featureImageDirectory)
         if feat is None:
             tester.carouselSeriesLock.release()
-        elif tester.currentFeature.featureName=="ApproxCenter" or tester.currentFeature.featureName=="PreciseCenter":
+        elif feat.featureName=="ApproxCenter" or feat.featureName=="PreciseCenter":
             stepAngle=1.3
             while angle<360:
                 if tester.jiggleRepetitionPhotos>0:
@@ -1065,7 +1091,7 @@ def seriesCapture():
                 time.sleep(1)
                 angle+=stepAngle
             tester.carouselSeriesLock.release()
-        elif tester.currentFeature.featureName=="LeftLetter" or tester.currentFeature.featureName=="RightLetter" or tester.currentFeature.featureName=="ReagentLevel":
+        elif feat.featureName=="LeftLetter" or feat.featureName=="RightLetter" or feat.featureName=="ReagentLevel":
             stepAngle=30
             centerReagent(tester)
             while angle<360:
@@ -1086,7 +1112,7 @@ def seriesCapture():
                 time.sleep(1)
                 angle+=stepAngle
             tester.carouselSeriesLock.release()
-        elif tester.currentFeature.featureName=="DripTop":
+        elif feat.featureName=="DripTop":
             dripStrokeLength=25
             plungerIncrement=.1
             currentStrokePosition=0
@@ -1106,30 +1132,7 @@ def seriesCapture():
                 time.sleep(1)
                 currentStrokePosition+=plungerIncrement
             tester.carouselSeriesLock.release()
-        elif tester.currentFeature.featureName=="MixerLevel":
-            refillCount=10
-            numRefills=0
-            while numRefills<refillCount:
-                print('Iteration: ' + str(numRefills+1))
-                tester.closeMixerValve()
-                time.sleep(.5)
-                tester.turnPumpOn()
-                time.sleep(12)
-                tester.turnPumpOff()
-                numPhotos=30
-                photoNum=0
-                while photoNum<numPhotos:
-                    feat.snapPhoto(tester)
-                    time.sleep(.5)
-                    tester.openMixerValve()
-                    time.sleep(.15)
-                    tester.closeMixerValve()
-                    time.sleep(1)
-                    photoNum+=1
-                tester.openMixerValve()
-                time.sleep(2)
-                numRefills+=1
-        elif tester.currentFeature.featureName=="LeftStopper" or tester.currentFeature.featureName=="RightStopper":
+        elif feat.featureName=="LeftStopper" or feat.featureName=="RightStopper":
             upDownCycleCount=10
             minDepth=2
             maxDepth=-10
@@ -1158,6 +1161,38 @@ def seriesCapture():
                 else:
                     print('Cycle complete - stopped due to max height')
                 cycleCount+=1
+        elif feat.featureName=="MixerOverflow" or feat.featureName=="MixerLevel":             
+            numCycles=5
+            fillingCycles=20
+            attemptCount=0
+            while attemptCount<numCycles:
+                setMixerReference(tester)
+                tester.openMixerValve()
+                time.sleep(5)
+                tester.closeMixerValve()
+                time.sleep(.5)
+                fillCount=0
+                while fillCount<fillingCycles:
+                    time.sleep(.2)
+                    tester.turnPumpOn()
+                    if feat.featureName=="MixerOverflow":
+                        pumpOnTime=2.0
+                    else:
+                        pumpOnTime=.4
+                    time.sleep(pumpOnTime)
+                    tester.turnPumpOff()
+                    print('Adding for ' + str(pumpOnTime) + ' secs')
+                    tester.videoLowResCaptureLock.acquire()
+                    tester.videoLowResCaptureLock.wait()
+                    currentMixOverflow=feat.clipImage(tester,tester.latestLowResImage)
+                    tester.videoLowResCaptureLock.release()
+                    diff=cv2.absdiff(currentMixOverflow,feat.referenceClip)
+                    fn=tester.basePath + 'Images/' + feat.featureName + '/Image-' + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S.%f") + '.jpg'
+                    cv2.imwrite(fn,diff)
+                    fillCount+=1
+                attemptCount+=1
+            tester.openMixerValve()
+        tester.infoMessage('Finished Series Sample Generation for Feature: ' + feat.featureName)
             
 def findReferenceDots():   
     orientationDotSamples=0
@@ -1368,137 +1403,53 @@ def setMixerReference(tester):
     mixerOverflowFeature.referenceClip=mixerOverflowFeature.clipImage(tester,tester.latestLowResImage)
     tester.videoLowResCaptureLock.release()
     
-def getMixerLevelFromSubtractedImage(mixerFeature,subtractionImage):
-    imageBW=cv2.cvtColor(subtractionImage,cv2.COLOR_BGR2GRAY)
-    bW01=cv2.normalize(imageBW.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
-    ret2,th2 = cv2.threshold(imageBW,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-    mixerCol=np.sum(th2,1)
-    mixerSum=np.sum(mixerCol)
-    weightedCol=mixerCol/mixerSum
-    numRows=len(mixerCol)
-    mixerHeight=range(numRows)
-    heightArray=np.asarray(mixerHeight)
-    centroidHeight=np.inner(weightedCol,heightArray)
-    #Test 1 - Is the centroid below the center?
-    if centroidHeight<=(numRows/2-20):
-        return 0
-    im2, contours, hierarchy = cv2.findContours(th2,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    maxArea=0
-    secondToMaxArea=0
-    maxContour=None
-    secondToMaxContour=None
-    #Get the 2 biggest contours
-    for contour in contours:
-        area=cv2.contourArea(contour)
-        if area>maxArea:
-            secondToMaxArea=maxArea
-            secondToMaxContour=maxContour
-            maxArea=area
-            maxContour=contour
-        elif area>secondToMaxArea:
-            secondToMaxArea=area
-            secondToMaxContour=contour
-    x1,y1,w1,h1 = cv2.boundingRect(maxContour)
-    maxRect=w1*h1    
-    x2,y2,w2,h2 = cv2.boundingRect(secondToMaxContour)
-    secondToMaxRect=w2*h2    
-    #Test 2 - Does one of the two biggest centroids extend to the bottom:
-    if y1+h1>=numRows-1:
-#        print('Max Contour extends to bottom')
-        bottomContour=maxContour
-        bottomX=x1
-        bottomY=y1
-        bottomH=h1
-        bottomW=w1
-        topContour=secondToMaxContour
-        topX=x2
-        topY=y2
-        topH=h2
-        topW=w2
-    elif y2+h2>=numRows-1:
-#        print('Second to Max Contour extends to bottom')
-        bottomContour=secondToMaxContour
-        bottomX=x2
-        bottomY=y2
-        bottomH=h2
-        bottomW=w2
-        topContour=maxContour
-        topX=x1
-        topY=y1
-        topH=h1
-        topW=w1
-    else:
-        return 0 #Neither conntour goes to the bottom
-    minimumWidth=20
-    #Test 3 - Is the bottom box wide enough:
-    if bottomW<minimumWidth:
-        return 0
-    addTopContour=True
-    if topW<minimumWidth:
-        addTopContour=False
-    #Test 4 does top contour abut lower contour
-    maxTopToBottomSkew=2
-    if abs((topY+topH)-bottomY)>maxTopToBottomSkew:
-        addTopContour=False
-    #Test 5 is the horizontal center of the top contour near the center of the bottom contour
-    maxSideToSideSkew=4
-    if abs((topX+topW/2)-(bottomX+bottomW/2))>maxSideToSideSkew:
-        addTopContour=False            
-    if addTopContour:
-        pixelHeight=topY
-    else:
-        pixelHeight=bottomY
-    ml=mixerFeature.positionCoefficientA*pixelHeight+mixerFeature.positionCoefficientB
-    return ml
-
 def findMixerFillHeight(tester):
-    mixerFeature=tester.featureList["MixerLevel"]
-    tester.videoLowResCaptureLock.acquire()
-    tester.videoLowResCaptureLock.wait()
-    currentMixLevel=mixerFeature.clipImage(tester,tester.latestLowResImage)
-    tester.videoLowResCaptureLock.release()
-    diff=cv2.absdiff(currentMixLevel,mixerFeature.referenceClip)
-    return getMixerLevelFromSubtractedImage(mixerFeature,diff)
-
-def fillMixingCylinder(tester,vol=5):
-    numCycles=5
-    fillingCycles=20
-    attemptCount=0
-    while attemptCount<numCycles:
-        setMixerReference(tester)
-        tester.openMixerValve()
-        time.sleep(5)
-        tester.closeMixerValve()
-        time.sleep(.5)
-        fillCount=0
-        while fillCount<fillingCycles:
-            time.sleep(.2)
-            tester.turnPumpOn()
-            time.sleep(1)
-            tester.turnPumpOff()
-            print('Adding for ' + str(.2) + ' secs')
+    try:
+        maxMixerHeight=13
+        mixerFeature=tester.featureList["MixerLevel"]
+        tester.videoLowResCaptureLock.acquire()
+        tester.videoLowResCaptureLock.wait()
+        currentMixLevel=mixerFeature.clipImage(tester,tester.latestLowResImage)
+        tester.videoLowResCaptureLock.release()
+        mixerLevelInMM=mixerFeature.getMixerLevelBasedOnDifference(currentMixLevel)
+        if mixerLevelInMM==0:  #May be empty, may be full
             mixerOverflowFeature=tester.featureList["MixerOverflow"]
             tester.videoLowResCaptureLock.acquire()
             tester.videoLowResCaptureLock.wait()
-            currentMixOverflow=mixerOverflowFeature.clipImage(tester,tester.latestLowResImage)
+            currentMixLevel=mixerFeature.clipImage(tester,tester.latestLowResImage)
+            currentOverflowLevel=mixerOverflowFeature.clipImage(tester,tester.latestLowResImage)
             tester.videoLowResCaptureLock.release()
-            diff=cv2.absdiff(currentMixOverflow,mixerOverflowFeature.referenceClip)
-            fn=tester.basePath + 'Images/MixerOverflow/Image-' + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S.%f") + '.jpg'
-            cv2.imwrite(fn,diff)
-            fillCount+=1
-        attemptCount+=1
+            mixerLevelInMM=mixerFeature.getMixerLevelBasedOnDifference(currentMixLevel)
+            if mixerLevelInMM==0:
+                mixerOverFlow=mixerOverflowFeature.isMixerOverflowing(currentOverflowLevel)
+                if mixerOverFlow:
+                    return maxMixerHeight
+                else:
+                    return 0
+            else:
+                return mixerLevelInMM
+        else:
+            return mixerLevelInMM
+    except:
+        tester.debugLog.exception("Failed finding mixture level")                    
+        return 0
 
-def fillMixingCylinderReal(tester,vol=5):
+def fillMixingCylinder(tester,vol=5,runAsDiagnostic=False):
     trueVol=vol+tester.mlDisplacedByMagnet+tester.mixerWaterLevelAdjustment    
     try:
         maxFillingAttempts=5
         maxFillingSteps=20
         attemptCount=0
-        setMixerReference(tester)
         while attemptCount<maxFillingAttempts:
+            if runAsDiagnostic:
+                tester.debugLog.info('Starting fill attempt: ' + str(attemptCount))                        
             tester.openMixerValve()
             time.sleep(5)
+            if runAsDiagnostic:
+                tester.debugLog.info('Filling the Mixer')                        
             tester.closeMixerValve()
+            time.sleep(.5)
+            setMixerReference(tester)
             time.sleep(.5)
             tester.turnPumpOn()
             time.sleep(tester.fillTimePerML*trueVol)
@@ -1508,21 +1459,27 @@ def fillMixingCylinderReal(tester,vol=5):
                 time.sleep(.2)
                 mixerWaterLevel=findMixerFillHeight(tester)
                 if abs(mixerWaterLevel-trueVol)<.2:
+                    if runAsDiagnostic:
+                        tester.debugLog.info('Mixer Filled')                        
                     return True
                 elif mixerWaterLevel>=trueVol:
                     time.sleep(.2)
                     tester.openMixerValve()
                     time.sleep(.2)
                     tester.closeMixerValve()
-                    print('Water Level: ' + str(mixerWaterLevel) + ', Releasing for ' + str(.2) + ' secs')
+                    if runAsDiagnostic:
+                        tester.debugLog.info('Water Level: ' + str(mixerWaterLevel) + ', Releasing for ' + str(.2) + ' secs')                        
                 elif mixerWaterLevel<=trueVol:
                     time.sleep(.2)
                     tester.turnPumpOn()
                     time.sleep(.2)
                     tester.turnPumpOff()
-                    print('Water Level: ' + str(mixerWaterLevel) + ', Adding for ' + str(.2) + ' secs')
+                    if runAsDiagnostic:
+                        tester.debugLog.info('Water Level: ' + str(mixerWaterLevel) + ', Adding for ' + str(.2) + ' secs')                        
                 attemptStep+=1
             attemptCount+=1        
+        if runAsDiagnostic:
+            tester.debugLog.info('Refill retries exceeded')                        
         tester.debugMessage('Refill retries exceeded')
         return False
     except:
@@ -1865,6 +1822,11 @@ def runDiagnosticTest(diagnosticTest):
         tester.debugLog.info("Starting Drop Dispensing Diagnostic for " + str(stepsToRun) + ' cycles')
         testDispensing(tester,int(stepsToRun))
         tester.debugLog.info("Drop Dispense Diagnostic test completed - see Debug log for results")
+    elif diagnosticTest[0]=='Fill Mixer Diagnostic':
+        stepsToRun=diagnosticTest[1]
+        tester.debugLog.info("Starting Mixer Fill Diagnostic for " + str(stepsToRun) + ' cycles')
+        testMixerFill(tester,int(stepsToRun))
+        tester.debugLog.info("Mixer Fill Diagnostic test completed - see Debug log for results")
     else:
         try:
             print('Unknown diagnostic test ' + diagnosticTest[0])
