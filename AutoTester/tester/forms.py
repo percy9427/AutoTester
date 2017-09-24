@@ -92,6 +92,8 @@ class TesterForm(forms.ModelForm):
             self.fields['fillTimePerML'].widget.attrs['title'] = "Approx how long in seconds to pump 1ML of water into the mixing chamber.  Does not need to exact"
             self.fields['mlDisplacedByMagnet'].label="ml Displaced by Magnet"
             self.fields['mlDisplacedByMagnet'].widget.attrs['title'] = "How much liquid (in ml) does the agitator magnet displace"
+            self.fields['mixerWaterLevelAdjustment'].label="Adjust Mixer Water Level"
+            self.fields['mixerWaterLevelAdjustment'].widget.attrs['title'] = "Amount in ml to increase or decrease the mixer level. Add ml (+) if the water level is consistently too low, Subtract ml (-) if consistently too high"
             self.fields['reagentRemainingMLAlarmThreshold'].label="Reagent Low Threshold"
             self.fields['reagentRemainingMLAlarmThreshold'].widget.attrs['title'] = "A reagent is considered low when this many usable ML remain"
             self.fields['reagentAlmostEmptyAlarmEnable'].label="Send Reagent Low Alarms"

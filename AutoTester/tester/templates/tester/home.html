@@ -1,4 +1,4 @@
-{% extends 'tester/refreshbase.html' %}
+{% extends 'tester/base.html' %}
 
 {% block content %}
 <img src='http://{{streamingURL}}/tester.mjpg'  title="Live feed from inside the autotester">
@@ -26,9 +26,9 @@ Test Queue<br>
 			{% if job.jobAction == "DELETE" %}
 				title="Delete this job from the queue" onclick="return confirm('Are You Sure?')" 
 			{% elif job.jobAction == "REMOVE" %}
-				title="Remove this job from the queue"  onclick="return confirm('Are You Sure?')
+				title="Remove this job from the queue"  onclick="return confirm('Are You Sure?')"
 			{% elif job.jobAction == "CANCEL" %}
-				title="Abort this job"  onclick="return confirm('Are You Sure?')
+				title="Abort this job"  onclick="return confirm('Are You Sure?')"
 			{% endif %}
 			value="{{job.jobAction}}-{{job.jobIndex}}">{{job.jobAction}}</button></td>
 			</tr>

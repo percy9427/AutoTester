@@ -296,6 +296,7 @@ class Tester:
         self.mixerCleanCycles=te.mixerCleanCycles
         self.fillTimePerML=te.fillTimePerML
         self.mlDisplacedByMagnet=te.mlDisplacedByMagnet
+        self.mixerWaterLevelAdjustment=te.mixerWaterLevelAdjustment
         self.reagentRemainingMLAlarmThreshold=te.reagentRemainingMLAlarmThreshold
         self.reagentAlmostEmptyAlarmEnable=te.reagentAlmostEmptyAlarmEnable
         self.pauseInSecsBeforeEmptyingMixingChamber=te.pauseInSecsBeforeEmptyingMixingChamber
