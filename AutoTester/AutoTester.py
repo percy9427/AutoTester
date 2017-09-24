@@ -1378,7 +1378,6 @@ def getMixerLevelFromSubtractedImage(mixerFeature,subtractionImage):
     if centroidHeight<=(numRows/2-10):
         return 0
     im2, contours, hierarchy = cv2.findContours(th2,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    black=np.zeros(image.shape,dtype=np.uint8)
     maxArea=0
     secondToMaxArea=0
     maxContour=None
@@ -1454,9 +1453,10 @@ def findMixerFillHeight(tester):
     currentMixLevel=mixerFeature.clipImage(tester,tester.latestLowResImage)
     tester.videoLowResCaptureLock.release()
     diff=cv2.absdiff(currentMixLevel,mixerFeature.referenceClip)
-    return getMixerLevelFromSubtractedImage(diff)
+    return getMixerLevelFromSubtractedImage(mixerFeature,diff)
 
-def fillMixingCylinder(tester,vol=5):    
+def fillMixingCylinder(tester,vol=5):
+    trueVol=vol+tester.mlDisplacedByMagnet    
     try:
         maxFillingAttempts=5
         maxFillingSteps=20
@@ -1466,21 +1466,21 @@ def fillMixingCylinder(tester,vol=5):
             tester.closeMixerValve()
             time.sleep(.5)
             tester.turnPumpOn()
-            time.sleep(tester.fillTimePerML*vol)
+            time.sleep(tester.fillTimePerML*trueVol)
             attemptStep=0
             tester.turnPumpOff()
             while attemptStep<maxFillingSteps:
                 time.sleep(.2)
                 mixerWaterLevel=findMixerFillHeight(tester)
-                if abs(mixerWaterLevel-vol)<.5:
+                if abs(mixerWaterLevel-trueVol)<.2:
                     return True
-                elif mixerWaterLevel>=vol:
+                elif mixerWaterLevel>=trueVol:
                     time.sleep(.2)
                     tester.openMixerValve()
                     time.sleep(.2)
                     tester.closeMixerValve()
                     print('Water Level: ' + str(mixerWaterLevel) + ', Releasing for ' + str(.2) + ' secs')
-                elif mixerWaterLevel<=vol:
+                elif mixerWaterLevel<=trueVol:
                     time.sleep(.2)
                     tester.turnPumpOn()
                     time.sleep(.2)

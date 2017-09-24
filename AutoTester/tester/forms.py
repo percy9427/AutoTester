@@ -90,6 +90,8 @@ class TesterForm(forms.ModelForm):
             self.fields['mixerCleanCycles'].widget.attrs['title'] = "How many times to clean the mixer at the beginning of each test"
             self.fields['fillTimePerML'].label="Fill time per ML"
             self.fields['fillTimePerML'].widget.attrs['title'] = "Approx how long in seconds to pump 1ML of water into the mixing chamber.  Does not need to exact"
+            self.fields['mlDisplacedByMagnet'].label="ml Displaced by Magnet"
+            self.fields['mlDisplacedByMagnet'].widget.attrs['title'] = "How much liquid (in ml) does the agitator magnet displace"
             self.fields['reagentRemainingMLAlarmThreshold'].label="Reagent Low Threshold"
             self.fields['reagentRemainingMLAlarmThreshold'].widget.attrs['title'] = "A reagent is considered low when this many usable ML remain"
             self.fields['reagentAlmostEmptyAlarmEnable'].label="Send Reagent Low Alarms"
