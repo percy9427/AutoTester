@@ -46,6 +46,7 @@ class feature:
         self.usesRaw=False
         self.model=None
         self.lastVisualState=None
+        self.referenceClip=None
         self.centerImage=False
         self.boundingBoxList=None
         self.previousDarkPixelCount=None

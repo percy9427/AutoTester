@@ -536,7 +536,7 @@ def findImageShift(tester,carouselFeature,latestFullImage,maxShift):
     minImageDiff=100000000000
     for shiftIndex in range(maxShift):
         shiftedImage=carouselFeature.clipImage(tester,latestFullImage,rowOffset=-shiftIndex)
-        diff=cv2.absdiff(shiftedImage,tester.carouselBaseLineImage)
+        diff=cv2.absdiff(shiftedImage,carouselFeature.referenceClip)
         diffSum=np.sum(diff)
         if diffSum<minImageDiff:
             minShift=shiftIndex
@@ -549,7 +549,7 @@ def liftPlungerASmallBit(tester,distance=.2,firstCall=False):
     if firstCall:
         tester.videoLowResCaptureLock.acquire()
         tester.videoLowResCaptureLock.wait()
-        tester.carouselBaseLineImage=carouselFeature.clipImage(tester,tester.latestLowResImage)
+        carouselFeature.referenceClip=carouselFeature.clipImage(tester,tester.latestLowResImage)
         tester.videoLowResCaptureLock.release()
     queuePlungerMove(tester,distance)
     waitUntilPlungerStopsMoving(tester)
@@ -558,7 +558,6 @@ def liftPlungerASmallBit(tester,distance=.2,firstCall=False):
     latestFullImage=tester.latestLowResImage.copy()
     tester.videoLowResCaptureLock.release()
     bestShiftMatch=findImageShift(tester,carouselFeature,latestFullImage,3)
-#    tester.carouselBaseLineImage=carouselFeature.clipImage(tester,latestFullImage)
     return bestShiftMatch
 
 def determineStopperClosureValue(tester):
@@ -941,11 +940,6 @@ def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAs
         if runAsDiagnostic:
             tester.debugLog.info(str(dropCount) + ' Dispensed')
         tester.infoMessage(str(dropCount) + ' Dispensed')
-    #    print(log)
-        txtfile=open("/home/pi/testerdata/Data/dripStats-" + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S") + '.csv','w')
-        txtfile.write(log)
-        txtfile.close()
-#        saveTopDripList(tester)
         if waitUntilPlungerRaised:
             setPlungerPosition(tester,tester.PLUNGER_OPEN)
         else:
@@ -1361,69 +1355,138 @@ def cleanMixer(tester):
     except:
         tester.debugLog.exception("Failure cleaning Mixer")
     
-def fillMixingCylinder(tester,vol=5):
-    tester.closeMixerValve()
-    time.sleep(.5)
-    tester.turnPumpOn()
-    time.sleep(tester.fillTimePerML*vol)
-    tester.turnPumpOff()
-    mixerLevelClip=tester.featureList['MixerLevel']
-    maxFillingAttempts=5
-    maxFillingSteps=20
-    attemptCount=0
-    attemptStep=0
-    mixerWaterLevel=0
+def setMixerReference(tester):
+    mixerFeature=tester.featureList["MixerLevel"]
+    tester.videoLowResCaptureLock.acquire()
+    tester.videoLowResCaptureLock.wait()
+    mixerFeature.referenceClip=mixerFeature.clipImage(tester,tester.latestLowResImage)
+    tester.videoLowResCaptureLock.release()
+    
+def getMixerLevelFromSubtractedImage(mixerFeature,subtractionImage):
+    imageBW=cv2.cvtColor(subtractionImage,cv2.COLOR_BGR2GRAY)
+    bW01=cv2.normalize(imageBW.astype('float'), None, 0.0, 1.0, cv2.NORM_MINMAX)
+    ret2,th2 = cv2.threshold(imageBW,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    mixerCol=np.sum(th2,1)
+    mixerSum=np.sum(mixerCol)
+    weightedCol=mixerCol/mixerSum
+    numRows=len(mixerCol)
+    mixerHeight=range(numRows)
+    heightArray=np.asarray(mixerHeight)
+    centroidHeight=np.inner(weightedCol,heightArray)
+    #Test 1 - Is the centroid below the center?
+    print(centroidHeight)
+    if centroidHeight<=(numRows/2-10):
+        return 0
+    im2, contours, hierarchy = cv2.findContours(th2,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    black=np.zeros(image.shape,dtype=np.uint8)
+    maxArea=0
+    secondToMaxArea=0
+    maxContour=None
+    secondToMaxContour=None
+    #Get the 2 biggest contours
+    for contour in contours:
+        area=cv2.contourArea(contour)
+        if area>maxArea:
+            secondToMaxArea=maxArea
+            secondToMaxContour=maxContour
+            maxArea=area
+            maxContour=contour
+        elif area>secondToMaxArea:
+            secondToMaxArea=area
+            secondToMaxContour=contour
+    x1,y1,w1,h1 = cv2.boundingRect(maxContour)
+    maxRect=w1*h1    
+    x2,y2,w2,h2 = cv2.boundingRect(secondToMaxContour)
+    secondToMaxRect=w2*h2    
+    #Test 2 - Does one of the two biggest centroids extend to the bottom:
+    if y1+h1>=numRows-1:
+#        print('Max Contour extends to bottom')
+        bottomContour=maxContour
+        bottomX=x1
+        bottomY=y1
+        bottomH=h1
+        bottomW=w1
+        topContour=secondToMaxContour
+        topX=x2
+        topY=y2
+        topH=h2
+        topW=w2
+    elif y2+h2>=numRows-1:
+#        print('Second to Max Contour extends to bottom')
+        bottomContour=secondToMaxContour
+        bottomX=x2
+        bottomY=y2
+        bottomH=h2
+        bottomW=w2
+        topContour=maxContour
+        topX=x1
+        topY=y1
+        topH=h1
+        topW=w1
+    else:
+        return 0 #Neither conntour goes to the bottom
+    minimumWidth=20
+    #Test 3 - Is the bottom box wide enough:
+    if bottomW<minimumWidth:
+        return 0
+    addTopContour=True
+    if topW<minimumWidth:
+        addTopContour=False
+    #Test 4 does top contour abut lower contour
+    maxTopToBottomSkew=2
+    if abs((topY+topH)-bottomY)>maxTopToBottomSkew:
+        addTopContour=False
+    #Test 5 is the horizontal center of the top contour near the center of the bottom contour
+    maxSideToSideSkew=4
+    if abs((topX+topW/2)-(bottomX+bottomW/2))>maxSideToSideSkew:
+        addTopContour=False            
+    if addTopContour:
+        pixelHeight=topY
+    else:
+        pixelHeight=bottomY
+    ml=mixerFeature.positionCoefficientA*pixelHeight+mixerFeature.positionCoefficientB
+    return ml
+
+def findMixerFillHeight(tester):
+    mixerFeature=tester.featureList["MixerLevel"]
+    tester.videoLowResCaptureLock.acquire()
+    tester.videoLowResCaptureLock.wait()
+    currentMixLevel=mixerFeature.clipImage(tester,tester.latestLowResImage)
+    tester.videoLowResCaptureLock.release()
+    diff=cv2.absdiff(currentMixLevel,mixerFeature.referenceClip)
+    return getMixerLevelFromSubtractedImage(diff)
+
+def fillMixingCylinder(tester,vol=5):    
     try:
+        maxFillingAttempts=5
+        maxFillingSteps=20
+        attemptCount=0
+        setMixerReference(tester)
         while attemptCount<maxFillingAttempts:
+            tester.closeMixerValve()
+            time.sleep(.5)
+            tester.turnPumpOn()
+            time.sleep(tester.fillTimePerML*vol)
+            attemptStep=0
+            tester.turnPumpOff()
             while attemptStep<maxFillingSteps:
                 time.sleep(.2)
-                tester.videoLowResCaptureLock.acquire()
-                tester.videoLowResCaptureLock.wait()
-                currentMixerImage=mixerLevelClip.clipImage(tester,tester.latestLowResImage)
-                tester.videoLowResCaptureLock.release()
-                levelFoundList=testDlibForVerticalPosition(mixerLevelClip,currentMixerImage)
-                if len(levelFoundList)==0:
-                    if attemptCount>=maxFillingSteps:
-                        nextAction="Refill"
-                    else:
-                        nextAction="Decrease"
-                elif len(levelFoundList)==1:
-                    mixerWaterLevel=levelFoundList[0]
-                    if abs(mixerWaterLevel-vol)>.5:
-                        if mixerWaterLevel>=vol:
-                            nextAction="Decrease"
-                        elif mixerWaterLevel<=vol:
-                            nextAction="Fill"
-                    else:
-                        nextAction="Steady"
-                else:
-                    print('Somehow got >1 levels found')
-                    if attemptCount>=maxFillingSteps:
-                        nextAction="Refill"
-                    else:
-                        nextAction="Decrease"
-                attemptStep+=1
-                if nextAction=="Refill":
-                    tester.openMixerValve()
-                    time.sleep(5)
-                    tester.turnPumpOn()
-                    refillTime=randint(0,12)
-                    time.sleep(refillTime)
-                    tester.turnPumpOff()
-                elif nextAction=="Decrease":
+                mixerWaterLevel=findMixerFillHeight(tester)
+                if abs(mixerWaterLevel-vol)<.5:
+                    return True
+                elif mixerWaterLevel>=vol:
                     time.sleep(.2)
                     tester.openMixerValve()
                     time.sleep(.2)
                     tester.closeMixerValve()
                     print('Water Level: ' + str(mixerWaterLevel) + ', Releasing for ' + str(.2) + ' secs')
-                elif nextAction=="Fill":
+                elif mixerWaterLevel<=vol:
                     time.sleep(.2)
                     tester.turnPumpOn()
                     time.sleep(.2)
                     tester.turnPumpOff()
                     print('Water Level: ' + str(mixerWaterLevel) + ', Adding for ' + str(.2) + ' secs')
-                elif nextAction=='Steady':
-                    return True
+                attemptStep+=1
             attemptCount+=1        
         tester.debugMessage('Refill retries exceeded')
         return False
@@ -1465,45 +1528,52 @@ def convertMLtoDrops(mlToDispense):
     return round(20*mlToDispense)
     
 def runTestStep(tester,testStepNumber,testName,waterVolInML,reagentSlot,agitateSecs,reagentDispenseType,amountToDispense,lastStep=False):
-    tester.testStatus='Rotating to Reagent ' + str(testStepNumber)
-    success=rotateToPosition(tester,reagentSlot)
-    if not success:
-        sendUnableToRotateAlarm(tester,reagentSlot,testName)
-        return False
-    if waterVolInML>0:
-        tester.testStatus='Cleaning the Mixer'
-        cleanMixer(tester)
-        tester.testStatus='Filling the Mixing Cylinder'
-        fillResult=fillMixingCylinder(tester,waterVolInML)
-        if not fillResult:
-            tester.debugLog.info("Failure filling cylinder")
-            sendFillAlarm(tester,testName)
+    try:
+        tester.testStatus='Rotating to Reagent ' + str(testStepNumber)
+        success=rotateToPosition(tester,reagentSlot)
+        if not success:
+            tester.debugMessage('Unable to Rotate to Reagent ' + str(testStepNumber))
+            sendUnableToRotateAlarm(tester,reagentSlot,testName)
             return False
-    if agitateSecs>0:
-        tester.testStatus='Agitating the Reagent for ' + str(agitateSecs) + ' secs.'
-        agitatorStart(tester)
-        time.sleep(agitateSecs)
-        agitatorStop(tester)
-    tester.testStatus='Dispensing ' + str(amountToDispense) + ' ' + reagentDispenseType + '. (Video Disabled)'
-#    print('Video disabled while dispensing drops')
-    time.sleep(1)
-    if reagentDispenseType=='ml':
-        dropsToDispense=convertMLtoDrops(amountToDispense)
-    success=dispenseDrops(tester,dropsToDispense,waitUntilPlungerRaised=False,reagent=reagentSlot)
-    if not success:
-        sendDispenseAlarm(tester,reagentSlot,tester.lastReagentRemainingML)
-        return False
-#    print('Video re-enabled after drops')
-    if tester.lastReagentRemainingML<tester.reagentRemainingMLAlarmThreshold and tester.reagentAlmostEmptyAlarmEnable:
-        sendReagentAlarm(tester,reagentSlot,tester.lastReagentRemainingML)
-    tester.testStatus='Retracting plunger'
-    while not lastStep:
-        if tester.plungerState==tester.PLUNGER_OPEN or tester.plungerState==tester.PLUNGER_MOSTLY_CLOSED or tester.plungerState==tester.PLUNGER_FULLY_CLOSED:
-            break
+        if waterVolInML>0:
+            tester.testStatus='Cleaning the Mixer'
+            cleanMixer(tester)
+            tester.testStatus='Filling the Mixing Cylinder'
+            fillResult=fillMixingCylinder(tester,waterVolInML)
+            if not fillResult:
+                tester.debugLog.info("Failure filling cylinder")
+                sendFillAlarm(tester,testName)
+                return False
+        if agitateSecs>0:
+            tester.testStatus='Agitating the Reagent for ' + str(agitateSecs) + ' secs.'
+            agitatorStart(tester)
+            time.sleep(agitateSecs)
+            agitatorStop(tester)
+        tester.testStatus='Dispensing ' + str(amountToDispense) + ' ' + reagentDispenseType + '. (Video Disabled)'
+    #    print('Video disabled while dispensing drops')
+        time.sleep(1)
+        if reagentDispenseType=='ml':
+            dropsToDispense=convertMLtoDrops(amountToDispense)
         else:
-            print('Lifting Plunger')
-            time.sleep(1)
-    return True
+            dropsToDispense=amountToDispense
+        success=dispenseDrops(tester,dropsToDispense,waitUntilPlungerRaised=False,reagent=reagentSlot)
+        if not success:
+            sendDispenseAlarm(tester,reagentSlot,tester.lastReagentRemainingML)
+            return False
+    #    print('Video re-enabled after drops')
+        if tester.lastReagentRemainingML<tester.reagentRemainingMLAlarmThreshold and tester.reagentAlmostEmptyAlarmEnable:
+            sendReagentAlarm(tester,reagentSlot,tester.lastReagentRemainingML)
+        tester.testStatus='Retracting plunger'
+        while not lastStep:
+            if tester.plungerState==tester.PLUNGER_OPEN or tester.plungerState==tester.PLUNGER_MOSTLY_CLOSED or tester.plungerState==tester.PLUNGER_FULLY_CLOSED:
+                break
+            else:
+                print('Lifting Plunger')
+                time.sleep(1)
+        return True
+    except:
+        tester.debugLog.exception('Failure when running Test Step ' + str(testStepNumber))
+        return False
 
 def runTestSequence(tester,sequenceName):
     tester.systemStatus="Running Test"
@@ -1527,6 +1597,7 @@ def runTestSequence(tester,sequenceName):
             sendCannotOpenStoppersAlarm(tester,sequenceName)
             tester.systemStatus="Fault"
             return False
+        waitUntilPlungerStopsMoving(tester)
         testSucceeded=False
         if not ts.reagent1Slot is None and ts.reagent1DispenseCount>0:
             success=runTestStep(tester,1,sequenceName,ts.waterVolInML,ts.reagent1Slot,ts.reagent1AgitateSecs,ts.reagent1DispenseType,ts.reagent1DispenseCount,lastStep=numSteps==1)
@@ -1603,7 +1674,7 @@ def runTestSequence(tester,sequenceName):
             tester.testStatus='Test Failed'
         tester.colorTable=None
     except:
-        traceback.print_exc()
+        tester.debugLog.exception('Failure when running Test')
     tester.systemStatus="Idle"
     return testSucceeded
 
