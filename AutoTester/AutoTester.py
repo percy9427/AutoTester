@@ -1365,7 +1365,7 @@ def setMixerReference(tester):
     tester.videoLowResCaptureLock.acquire()
     tester.videoLowResCaptureLock.wait()
     mixerFeature.referenceClip=mixerFeature.clipImage(tester,tester.latestLowResImage)
-    mixerOverflow.referenceClip=mixerOverflow.clipImage(tester,tester.latestLowResImage)
+    mixerOverflowFeature.referenceClip=mixerOverflowFeature.clipImage(tester,tester.latestLowResImage)
     tester.videoLowResCaptureLock.release()
     
 def getMixerLevelFromSubtractedImage(mixerFeature,subtractionImage):
@@ -1474,9 +1474,9 @@ def fillMixingCylinder(tester,vol=5):
         while fillCount<fillingCycles:
             time.sleep(.2)
             tester.turnPumpOn()
-            time.sleep(.2)
+            time.sleep(1)
             tester.turnPumpOff()
-            print('Water Level: ' + str(mixerWaterLevel) + ', Adding for ' + str(.2) + ' secs')
+            print('Adding for ' + str(.2) + ' secs')
             mixerOverflowFeature=tester.featureList["MixerOverflow"]
             tester.videoLowResCaptureLock.acquire()
             tester.videoLowResCaptureLock.wait()
@@ -1485,6 +1485,8 @@ def fillMixingCylinder(tester,vol=5):
             diff=cv2.absdiff(currentMixOverflow,mixerOverflowFeature.referenceClip)
             fn=tester.basePath + 'Images/MixerOverflow/Image-' + datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S.%f") + '.jpg'
             cv2.imwrite(fn,diff)
+            fillCount+=1
+        attemptCount+=1
 
 def fillMixingCylinderReal(tester,vol=5):
     trueVol=vol+tester.mlDisplacedByMagnet+tester.mixerWaterLevelAdjustment    

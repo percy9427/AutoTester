@@ -362,6 +362,7 @@ class Tester:
             feat.confidenceThreshold=fe.confidenceThreshold
             feat.showConfidenceValues=fe.showConfidenceValues
             self.featureList[feat.featureName]=feat 
+#            print('Loading Model for ' + feat.featureName)
             loadModel(self,feat)  
             
     def saveFeaturePosition(self,feat):                  
