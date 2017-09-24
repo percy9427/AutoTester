@@ -672,12 +672,12 @@ def centerReagent(tester,precise=False):
         currOffset=testReagentPosition(tester,precise=bePrecise)
         previousBePrecise=bePrecise
         if currOffset is None:  #Didn't find a reagent, so just move a bit and check again
-            print('Step: ' + str(currStep) + ', Precise1: ' + str(bePrecise) + ' - Queue: ' + str(1))
+#            print('Step: ' + str(currStep) + ', Precise1: ' + str(bePrecise) + ' - Queue: ' + str(1))
             queueCarouselMove(tester,1/360)
             bePrecise=False
             time.sleep(1) 
         elif abs(currOffset)>minAlignmentRough:
-            print('Step: ' + str(currStep) + ', Precise2: ' + str(bePrecise) + ' - Queue: ' + str(currOffset))
+#            print('Step: ' + str(currStep) + ', Precise2: ' + str(bePrecise) + ' - Queue: ' + str(currOffset))
             queueCarouselMove(tester,currOffset/360) 
             bePrecise=False
             time.sleep(1)
@@ -691,7 +691,7 @@ def centerReagent(tester,precise=False):
                     distToMove=currOffset/(360*4)
                     if abs(distToMove<minAlignmentPrecise):
                         return True
-                    print('Step: ' + str(currStep) + ', Precise3: ' + str(bePrecise) + ' - Queue: ' + str(currOffset/(360*4)))
+#                    print('Step: ' + str(currStep) + ', Precise3: ' + str(bePrecise) + ' - Queue: ' + str(currOffset/(360*4)))
                     queueCarouselMove(tester,currOffset/(360*4))
                     previousBePrecise= bePrecise
                     time.sleep(1)
@@ -966,6 +966,7 @@ def testRotation(tester,numOfDestinations):
     failureCount=0
     setPlungerToOpen(tester,runAsDiagnostic=True)
     waitUntilPlungerStopsMoving(tester)
+    time.sleep(10)
     while testNum<numOfDestinations:
         randomDest=random.randint(0,11)
         dest=destinationLetters[randomDest]
