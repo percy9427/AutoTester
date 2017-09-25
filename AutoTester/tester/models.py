@@ -36,6 +36,8 @@ class TesterExternal(models.Model):
     fillTimePerML = models.FloatField(default=1,validators=[MinValueValidator(.1),MaxValueValidator(10),])
     mlDisplacedByMagnet = models.FloatField(default=.34,validators=[MinValueValidator(.1),MaxValueValidator(1),])
     mixerWaterLevelAdjustment = models.FloatField(default=0,validators=[MinValueValidator(-2),MaxValueValidator(2),])
+    maxPlungerDepthNoAgitator = models.FloatField(default=70,validators=[MinValueValidator(30),MaxValueValidator(100),])
+    maxPlungerDepthAgitator = models.FloatField(default=58,validators=[MinValueValidator(30),MaxValueValidator(100),])
     reagentRemainingMLAlarmThreshold = models.FloatField(default=1.0,validators=[MinValueValidator(0),MaxValueValidator(10)])
     reagentAlmostEmptyAlarmEnable = models.BooleanField(default=True)
     pauseInSecsBeforeEmptyingMixingChamber = models.IntegerField(default=10,validators=[MinValueValidator(0),MaxValueValidator(3600)])

@@ -220,8 +220,6 @@ class Tester:
         self.jiggleShiftMax=5
         self.jigglePhoto=False  #Turns on only when training photos are to be taken
         self.seriesRunning=False
-        self.maxPlungerDepthNoAgitator=79
-        self.maxPlungerDepthAgitator=67
         self.lastReagentRemainingML=0
         self.lastReagentName=None
         self.suppressProcessing=False
@@ -299,6 +297,8 @@ class Tester:
         self.fillTimePerML=te.fillTimePerML
         self.mlDisplacedByMagnet=te.mlDisplacedByMagnet
         self.mixerWaterLevelAdjustment=te.mixerWaterLevelAdjustment
+        self.maxPlungerDepthNoAgitator=te.maxPlungerDepthNoAgitator
+        self.maxPlungerDepthAgitator=te.maxPlungerDepthAgitator
         self.reagentRemainingMLAlarmThreshold=te.reagentRemainingMLAlarmThreshold
         self.reagentAlmostEmptyAlarmEnable=te.reagentAlmostEmptyAlarmEnable
         self.pauseInSecsBeforeEmptyingMixingChamber=te.pauseInSecsBeforeEmptyingMixingChamber
