@@ -573,7 +573,14 @@ def determineStopperClosureValue(tester):
             highestStopper=vertical
     return highestStopper
 
-def testPlungerPosition(tester,detectMotion=False):
+def testPlungerPosition(tester,useVisualOnly=False):
+    if not useVisualOnly:
+        if tester.plungerState==tester.PLUNGER_FULLY_CLOSED:
+            return 'Closed'
+        elif tester.plungerState==tester.PLUNGER_MIOSTLY_CLOSED:
+            return 'Closed'
+        if not tester.plungerState==tester.PLUNGER_UNKNOWN:
+            return 'Open'
     if tester.valueForStopperWhenClosed is None:
         return 'Unknown'
     currentStopperClosureValue=determineStopperClosureValue(tester)
@@ -584,7 +591,7 @@ def testPlungerPosition(tester,detectMotion=False):
         print('Open')
         return 'Open'
     
-def setPlungerToClosed(tester,runAsDiagnostic=False,ignorePlungerStatus=False): 
+def setPlungerToClosed(tester,runAsDiagnostic=False,ignorePlungerStatus=False,blockUntilDone=True): 
     if tester.plungerState==tester.PLUNGER_FULLY_CLOSED and not ignorePlungerStatus:
         return True
     if tester.plungerState==tester.PLUNGER_MOSTLY_CLOSED or tester.plungerState==tester.PLUNGER_UNKNOWN or ignorePlungerStatus:    
@@ -606,7 +613,17 @@ def setPlungerToClosed(tester,runAsDiagnostic=False,ignorePlungerStatus=False):
         if runAsDiagnostic:
             tester.debugLog.info('Plunger Position Set to Closed')
         markPlungerAsClosed(tester)
-        return True
+        if blockUntilDone:
+            secondsElapsed=0
+            while secondsElapsed<tester.MAX_WAIT_FOR_CLOSURE:
+                if tester.plungerState==tester.PLUNGER_FULLY_CLOSED:
+                    return True
+                time.sleep(1)
+                secondsElapsed+=1
+            tester.debugLog.info('Close timeout expired without reaching Closed State')
+            return False
+        else:        
+            return True
     else:
         tester.debugLog.info('Unable to Detect Plunger Closure.  Plunger May be Stuck')
         return False
@@ -635,9 +652,51 @@ def setPlungerPosition(tester,desiredPosition=None,runAsDiagnostic=False):
         tester.debugLog.exception("Plunger Seating Failure")
         return False
 
-def setPlungerToOpen(tester,runAsDiagnostic=False):
-    return setPlungerPosition(tester,desiredPosition=tester.PLUNGER_OPEN,runAsDiagnostic=runAsDiagnostic)    
-
+def setPlungerToOpen(tester,runAsDiagnostic=False,blockUntilDone=True):
+    result=setPlungerPosition(tester,desiredPosition=tester.PLUNGER_OPEN,runAsDiagnostic=runAsDiagnostic)    
+    if result:
+        if blockUntilDone:
+            secondsElapsed=0
+            while secondsElapsed<tester.MAX_WAIT_FOR_OPENING:
+                if tester.plungerState==tester.PLUNGER_OPEN or tester.plungerState==tester.PLUNGER_PAST_OPEN:
+                    return True
+                time.sleep(1)
+                secondsElapsed+=1
+            tester.debugLog.info('Open timeout expired without reaching Open State. Final State was: ' + str(tester.plungerState))
+            return False
+        else:        
+            return True
+        
+    else:
+        return False
+    
+def liftPlungerUntilExactlyOpen(tester,blockUntilDone=True):
+    if tester.plungerState==tester.PLUNGER_OPEN:
+        return True
+    if tester.plungerState==tester.PLUNGER_FULLY_CLOSED or tester.plungerState==tester.PLUNGER_MOSTLY_CLOSED or tester.plungerState==tester.PLUNGER_UNKNOWN:
+        return setPlungerToOpen(tester,blockUntilDone=blockUntilDone)
+    if tester.plungerState==tester.PLUNGER_PAST_OPEN:
+        currentPlungerMM=tester.plungerSteps/tester.plungerStepsPerMM
+        mmToLift=-tester.mmToRaiseFromOpenToFullyClosed-currentPlungerMM
+        queuePlungerMove(tester,mmToLift-.5)   #Subtract a smidge so it doesn't show up as past close
+        if blockUntilDone:
+            secondsElapsed=0
+            while secondsElapsed<tester.MAX_WAIT_FOR_CLOSURE:
+                if tester.plungerState==tester.PLUNGER_OPEN:
+                    return True
+                time.sleep(1)
+                secondsElapsed+=1
+            tester.debugLog.info('Close timeout expired with lifting to open state')
+            return False
+        else:        
+            return True
+                   
+        
+    else:
+        tester.debugLog.info('Unknown Plunger State: ' + str(tester.plungerStat))
+        return False
+        
+    
 def testReagentPosition(tester,precise=False):
     waitUntilCarouselStopsMoving(tester)
     if precise:
@@ -909,6 +968,8 @@ def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAs
         stepsUntilMaxDepth=plungerMaxDepth-tester.plungerSteps
         mmUntilMaxDepth=stepsUntilMaxDepth/tester.plungerStepsPerMM
 #        print(mmUntilMaxDepth)
+        if runAsDiagnostic:
+            tester.debugLog.info('Starting to lower the plunger')
         queuePlungerMove(tester,mmUntilMaxDepth,speed=tester.PLUNGER_HIGH_SPEED)
         currentSpeedIsHigh=True
         dropCount=0
@@ -928,24 +989,28 @@ def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAs
             if collectSamples:
                 log+=str(collectedSampleIndex) + ',' + str(dripTopValue) + '\n'
             sampleCount+=1
-        if dropCount>=numDrops:
-            tester.plungerAbort=True
-            if not reagent is None:
-                tester.saveReagentPosition(reagent)
-            time.sleep(1)
+        tester.plungerAbort=True
+        time.sleep(1)
         tester.plungerAbort=False
         tester.plungerSlow=False
         tester.suppressProcessing=False
         tester.undistortImage=originalDistortion
         if runAsDiagnostic:
+            tester.debugLog.info('Processing reactivated')
+        if dropCount>=numDrops:
             tester.debugLog.info(str(dropCount) + ' Dispensed')
-        tester.infoMessage(str(dropCount) + ' Dispensed')
-        if waitUntilPlungerRaised:
-            setPlungerPosition(tester,tester.PLUNGER_OPEN)
+            if not reagent is None:
+                tester.saveReagentPosition(reagent)
         else:
-            currentPlungerMM=tester.plungerSteps/tester.plungerStepsPerMM
-            mmToLift=-tester.mmToRaiseFromOpenToFullyClosed-currentPlungerMM
-            queuePlungerMove(tester,mmToLift)            
+            tester.debugLog.info('Plunger Hit Max Depth before drops dispensed')
+            if not reagent is None:
+                tester.saveReagentPosition(reagent)
+            tester.debugLog.info('Lifting plunger back up')
+            liftPlungerUntilExactlyOpen(tester,blockUntilDone=waitUntilPlungerRaised)
+            return False
+        if runAsDiagnostic:
+            tester.debugLog.info('Lifting plunger back up')
+        liftPlungerUntilExactlyOpen(tester,blockUntilDone=waitUntilPlungerRaised)
         if runAsDiagnostic:
             tester.debugLog.info('Drip Dispensing Done')
         tester.infoMessage('Drip Dispensing Done')
@@ -1256,7 +1321,7 @@ def findReferenceDots():
         return False  
     
 def parkTester(tester):
-    nozzlePos=testPlungerPosition(tester)
+    nozzlePos=testPlungerPosition(tester,useVisualOnly=True)
     if nozzlePos=="Closed":
         centeredStatus=testReagentPosition(tester,precise=False)
         if centeredStatus=="Centered":

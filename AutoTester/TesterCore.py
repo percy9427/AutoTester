@@ -87,6 +87,8 @@ class Tester:
     PLUNGER_MEDIUM_SPEED=1
     PLUNGER_LOW_SPEED=2
 
+    MAX_WAIT_FOR_CLOSURE=300
+    MAX_WAIT_FOR_OPENING=20
     
     SET_HOME_POSITION=9999999
     TIGHTEN_PAST_HOME_POSITION=9999998
@@ -601,7 +603,12 @@ class Tester:
             return
 
     def createDefaultBlackScreen(self):
+        font = cv2.FONT_HERSHEY_SIMPLEX        
         blackScreen=np.zeros((100,100),dtype=np.uint8)
+        cv2.putText(blackScreen,"Video",(10,20), font, .50,(255,255,255),2,cv2.LINE_AA)
+        cv2.putText(blackScreen,"Disabled",(10,40), font, .50,(255,255,255),2,cv2.LINE_AA)
+        cv2.putText(blackScreen,"during",(10,60), font, .50,(255,255,255),2,cv2.LINE_AA)
+        cv2.putText(blackScreen,"Dispense",(10,80), font, .50,(255,255,255),2,cv2.LINE_AA)
         r,jpg = cv2.imencode('.jpg',blackScreen)
         self.dummyBlackScreen=jpg        
             
