@@ -1504,7 +1504,7 @@ def fillMixingCylinder(tester,vol=5,runAsDiagnostic=False):
     trueVol=vol+tester.mlDisplacedByMagnet+tester.mixerWaterLevelAdjustment    
     try:
         maxFillingAttempts=5
-        maxFillingSteps=20
+        maxFillingSteps=50
         attemptCount=0
         while attemptCount<maxFillingAttempts:
             if runAsDiagnostic:
