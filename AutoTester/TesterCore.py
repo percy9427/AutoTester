@@ -502,7 +502,13 @@ class Tester:
             cs.swatchList[str(sw.swatchRow) + '/' + sw.lightingConditions]=sw
 
         self.currentColorSheet=cs
-        
+    
+    def makeResultStripDirectory(self):
+        if os.path.isdir(self.basePath + '/tester/static/tester/resultstrips'):
+            return
+        else:
+            os.mkdir(self.basePath + '/tester/static/tester/resultstrips') 
+               
     def saveTestResults(self,results,swatchResultList=None):
         try:
             from tester.models import TestResultsExternal
@@ -522,6 +528,7 @@ class Tester:
                 return True
             sw=swatchResultList[0]
             swatchStrip=sw.generateSwatchResultList(swatchResultList)
+            self.makeResultStripDirectory()
             saveName=self.basePath + '/tester/static/tester/resultstrips/Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
             cv2.imwrite(saveName,swatchStrip)
             return True
@@ -537,6 +544,7 @@ class Tester:
             oldRecords=TestResultsExternal.objects.filter(datetimePerformed__lte=removeRecordsOlderThan)
             for oldRecord in oldRecords:
                 oldRecord.delete()
+            self.makeResultStripDirectory()
             resultStripDirectory=self.basePath + '/tester/static/tester/resultstrips'
             fileList=os.listdir(resultStripDirectory)
             for file in fileList:
@@ -571,6 +579,7 @@ class Tester:
             tre.swatchFile='Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
             tre.save()
             errorStrip=self.failureList('Failure')
+            self.makeResultStripDirectory()
             saveName=self.basePath + '/tester/static/tester/resultstrips/Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
             cv2.imwrite(saveName,errorStrip)
             return True
