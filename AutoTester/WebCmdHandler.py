@@ -222,7 +222,10 @@ def parseControl(tester,cmdOperation,cmdObject,cmdValue):
         elif cmdOperation=='Clean':
             cleanMixer(tester)                     
         elif cmdOperation=='Fill5ML':
-            fillMixingCylinder(tester)                    
+            if cmdObject=='10':
+                fillMixingCylinder(tester,vol=10)
+            else:
+                fillMixingCylinder(tester)                                    
         else:
             print('Unknown CONTROL operation: ' + cmdOperation) 
     except:                  
@@ -432,6 +435,17 @@ def parseSchedule(tester,cmdOperation,cmdObject,cmdValue):
     except:
         tester.debugLog.exception("Error in SCHEDULE parsing")
 
+def parseReload(tester,cmdOperation,cmdObject,cmdValue):
+    try:
+        if cmdOperation=='TestDefs':
+            tester.loadTestDefinitionsFromDB()
+        elif cmdOperation=='Reagents':
+            tester.loadReagentsFromDB()
+        else:
+            print('Unknown RELOAD operation: ' + cmdOperation)                               
+    except:
+        tester.debugLog.exception("Error in SCHEDULE parsing")
+
 def processWebCommand(tester,commandString):
     resetDisplayFlags(tester)
     print('Command String Received: ' + str(commandString))
@@ -465,6 +479,8 @@ def processWebCommand(tester,commandString):
         parseAlarms(tester,cmdOperation,cmdObject,cmdValue)
     elif cmdCategory=='SCHEDULE':
         parseSchedule(tester,cmdOperation,cmdObject,cmdValue)
+    elif cmdCategory=='RELOAD':
+        parseReload(tester,cmdOperation,cmdObject,cmdValue)
     elif cmdCategory=='CLEAR':
         pass
     else:

@@ -32,6 +32,7 @@ import traceback
 import django
 from django.utils.timezone import activate
 from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 import pytz
 try:
     from picamera.array import PiRGBArray   # @UnresolvedImport
@@ -39,7 +40,7 @@ try:
 except:
     pass
 
-currentVersion="0.03"
+currentVersion="0.04"
 
 if platform.system()=='Windows':
     existsGPIO=False
@@ -68,6 +69,10 @@ mixerValveGPIO=19
 class testSequence:
     def __init__(self,name):
         self.testName=name
+
+class reagent:
+    def __init__(self,name):
+        self.name=name
 
 class Tester:
     CAMERATYPE_NONE=0
@@ -130,10 +135,10 @@ class Tester:
         self.ledOn=False
         self.pumpOn=False
         self.valveClosed=False
-        self.setTimeZone()
         self.loadTesterFromDB()
         self.loadProcessingParametersFromDB()
         self.loadStartupParametersFromDB()
+        self.loadReagentsFromDB()
         self.testerLog=logging.getLogger('TesterLog')
         handler = RotatingFileHandler(self.basePath+ "Logs/tester.log", maxBytes=2000, backupCount=4)
         simpleFormatter = logging.Formatter('%(asctime)s - %(message)s')
@@ -179,9 +184,11 @@ class Tester:
         self.plungerMoving=False
         self.distanceToMovePlunger=None
         self.movePlungerLock=None
+        self.speedToMovePlunger=self.PLUNGER_HIGH_SPEED
         self.plungerState=self.PLUNGER_UNKNOWN
         self.plungerSlow=False
         self.plungerAbort=False  #Immediately stops the plunger.  Used when final drop is detected
+        self.plungerPause=False  #The plunger pauses as long as this is set
         self.valueForStopperWhenClosed=None
         self.previousLeftStopperPosition=None
         self.stopperMovement=None
@@ -268,15 +275,6 @@ class Tester:
         except:  #Might not have initialized yet
             print(message)
             
-    def setTimeZone(self):
-        from tester.models import TesterExternal
-        te=TesterExternal.objects.get(pk=1)
-        tzString=te.currentTimeZone
-        try:
-            activate(tzString)
-        except:
-            self.infoMessage('TimeZone could not be activated using string ' + str(tzString))
-        
     def loadTesterFromDB(self):
         from tester.models import TesterExternal,TesterProcessingParameters
         te=TesterExternal.objects.get(pk=1)
@@ -305,6 +303,7 @@ class Tester:
         self.iftttSecretKey=te.iftttSecretKey
         self.stopperTighteningInMM=te.stopperTighteningInMM
         self.sendMeasurementReports=te.sendMeasurementReports
+        self.daysOfResultsToKeep=te.daysOfResultsToKeep
         self.enableConsoleOutput=te.enableConsoleOutput
         self.manageDatabases=te.manageDatabases
         
@@ -407,6 +406,13 @@ class Tester:
             ts.reagent3DispenseCount=seq.reagent3DispenseCount
             ts.agitateMixtureSecs=seq.agitateMixtureSecs
             ts.delayBeforeReadingSecs=seq.delayBeforeReadingSecs
+            ts.titrationSlot=seq.titrationSlot
+            if not ts.titrationSlot is None:
+                ts.titrationSlot=seq.titrationSlot.slotName
+            ts.titrationDispenseType=seq.titrationDispenseType
+            ts.titrationAgitateSecs=seq.titrationAgitateSecs
+            ts.titrationTransition=seq.titrationTransition
+            ts.titrationMaxDispenses=seq.titrationMaxDispenses
             ts.colorChartToUse=seq.colorChartToUse.colorSheetName
             ts.tooLowAlarmThreshold=seq.tooLowAlarmThreshold
             ts.tooLowWarningThreshold=seq.tooLowWarningThreshold
@@ -497,24 +503,93 @@ class Tester:
 
         self.currentColorSheet=cs
         
-    def saveTestResults(self,results):
-        from tester.models import TestResultsExternal
-        tre=TestResultsExternal()
-        tre.testPerformed=self.currentTest
-        tre.status='Completed'
-        tre.results=round(results,2)
-        tre.save()
+    def saveTestResults(self,results,swatchResultList=None):
+        try:
+            from tester.models import TestResultsExternal
+            tre=TestResultsExternal()
+            tre.testPerformed=self.currentTest
+            if results is None:
+                tre.results=None
+                tre.status='Failed'
+            else:
+                tre.status='Completed'
+                tre.results=round(results,2)
+            whenPerformed=timezone.now()
+            tre.datetimePerformed=whenPerformed
+            tre.swatchFile='Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
+            tre.save()
+            if swatchResultList is None:
+                return True
+            sw=swatchResultList[0]
+            swatchStrip=sw.generateSwatchResultList(swatchResultList)
+            saveName=self.basePath + '/tester/static/tester/resultstrips/Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
+            cv2.imwrite(saveName,swatchStrip)
+            return True
+        except:
+            traceback.print_exc()
+            return False
         
+    def removeOldRecords(self):
+        removeRecordsOlderThan=timezone.now()-datetime.timedelta(days=self.daysOfResultsToKeep)
+        print('Removing records older than: ' + str(removeRecordsOlderThan))
+        try:
+            from tester.models import TestResultsExternal
+            oldRecords=TestResultsExternal.objects.filter(datetimePerformed__lte=removeRecordsOlderThan)
+            for oldRecord in oldRecords:
+                oldRecord.delete()
+            resultStripDirectory=self.basePath + '/tester/static/tester/resultstrips'
+            fileList=os.listdir(resultStripDirectory)
+            for file in fileList:
+                if file[0:6]=='Strip-' and file[25:29]=='.jpg':
+                    dateString=file[6:25]
+                    fileDate=datetime.datetime.strptime(dateString,'%Y-%m-%d %H-%M-%S')
+                    if fileDate<removeRecordsOlderThan:
+                        os.remove(resultStripDirectory + '/' + file)
+        except:
+            traceback.print_exc()                        
+        return
+        
+    def failureList(self,text):
+        colSize=200
+        listStruct=np.zeros((30,colSize,3),dtype=np.uint8)
+        font = cv2.FONT_HERSHEY_SIMPLEX 
+        cv2.putText(listStruct,text,(10,20), font, .7,(255,255,255),2,cv2.LINE_AA)
+        return listStruct
+    
     def saveTestSaveBadResults(self):
-        from tester.models import TestResultsExternal
-        tre=TestResultsExternal()
-        tre.testPerformed=self.currentTest
-        if self.abortJob:
-            tre.status='Aborted'
-        else:
-            tre.status='Failed'
-        tre.results=None
-        tre.save()
+        try:
+            from tester.models import TestResultsExternal
+            tre=TestResultsExternal()
+            tre.testPerformed=self.currentTest
+            whenPerformed=timezone.now()
+            tre.datetimePerformed=whenPerformed
+            if self.abortJob:
+                tre.status='Aborted'
+            else:
+                tre.status='Failed'
+            tre.results=None
+            tre.swatchFile='Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
+            tre.save()
+            errorStrip=self.failureList('Failure')
+            saveName=self.basePath + '/tester/static/tester/resultstrips/Strip-' + whenPerformed.strftime("%Y-%m-%d %H-%M-%S") + '.jpg'
+            cv2.imwrite(saveName,errorStrip)
+            return True
+        except:
+            traceback.print_exc()
+            return False
+        
+    def loadReagentsFromDB(self):
+        try:
+            from tester.models import ReagentSetup
+            self.reagentList={}
+            reagentList=ReagentSetup.objects.all()
+            for rs in reagentList:
+                rg=reagent(name=rs.slotName)
+                rg.hasAgitator=rs.hasAgitator
+                self.reagentList[rg.name]=rg
+        except:
+            traceback.print_exc()
+            return False
         
     def saveReagentPosition(self,reagent):
         from tester.models import ReagentSetup
@@ -725,6 +800,8 @@ class Tester:
         stepsToMove=int(abs(self.plungerStepsPerMM*mm))
         self.plungerStepping=True
         while stepCountThisMove<stepsToMove:
+            while self.plungerPause:
+                time.sleep(.1)
             if self.plungerAbort:
                 self.plungerStepping=False
                 break
@@ -846,7 +923,7 @@ class Tester:
         from tester.models import JobExternal
         jobsQueued=JobExternal.objects.filter(jobStatus='Queued')
         for job in jobsQueued:
-            if job.timeStamp<=datetime.datetime.now():
+            if job.timeStamp<=timezone.now():
                 return True
         return False
     
@@ -854,13 +931,13 @@ class Tester:
         from tester.models import JobExternal,TestResultsExternal
         jobsQueued=JobExternal.objects.filter(jobStatus='Queued')
         for job in jobsQueued:
-            if job.timeStamp<=datetime.datetime.now():
+            if job.timeStamp<=timezone.now():
                 if not job.jobToRun.enableTest:
                     self.infoMessage('Job ' + job.jobToRun.testName + ' skipped since test disabled')
                     skippedTest=TestResultsExternal()
                     skippedTest.testPerformed=job.jobToRun.testName
                     skippedTest.status='Skipped'
-                    skippedTest.datetimePerformed=datetime.datetime.now()
+                    skippedTest.datetimePerformed=timezone.now()
                     skippedTest.save()
                     job.delete()
                 else:

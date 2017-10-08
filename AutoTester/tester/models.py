@@ -43,7 +43,7 @@ class TesterExternal(models.Model):
     pauseInSecsBeforeEmptyingMixingChamber = models.IntegerField(default=10,validators=[MinValueValidator(0),MaxValueValidator(3600)])
     iftttSecretKey = models.CharField(max_length=50, default=None, blank=True, help_text="How to set up webhooks and get secret key: https://www.hackster.io/ali-ozkil/ifttt-maker-channel-triggers-21365b")
     sendMeasurementReports = models.BooleanField(default=False)
-    currentTimeZone = models.CharField(max_length=50,default='US/Central',help_text="Enter your timezone from the list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones")
+    daysOfResultsToKeep = models.IntegerField(default=100)
     stopperTighteningInMM = models.FloatField(default=0,validators=[MinValueValidator(0),MaxValueValidator(3)])
     enableConsoleOutput = models.BooleanField(default=False)
     manageDatabases = models.BooleanField(default=False)
@@ -70,7 +70,8 @@ class TestResultsExternal(models.Model):
     testPerformed = models.CharField(max_length=200, default=None, help_text="This was the test that was run")
     results = models.FloatField(default=None, null=True, blank=True, help_text="Numeric results from running the test")
     status = models.CharField(max_length=200,default='Completed', help_text="Completion status of the test")
-    datetimePerformed = models.DateTimeField(auto_now_add=True, help_text="When the test was run")
+    datetimePerformed = models.DateTimeField(default=datetime.now, help_text="When the test was run")
+    swatchFile=models.CharField(max_length=200, default=None, null=True,blank=True,help_text="This was the test that was run")
 
     def __str__(self):
         return self.testPerformed
@@ -109,24 +110,14 @@ class ColorSheetExternal(models.Model):
         ordering = ['colorSheetName']
 
 
-class HourChoices(models.Model):
-    hour = models.TimeField(unique=True, help_text="Tests are on hour boundaries")
-    
-    def __str__(self):
-        return str(self.hour)
-
-    class Meta:
-        ordering = ['hour']
-
-    
 class TestDefinition(models.Model):
     testName = models.CharField(max_length=40, default='New Test',unique=True, blank=False, validators=[RegexValidator(regex='^New Test$',message='Pick a better name than New Test',inverse_match=True)])
     enableTest = models.BooleanField(default=True)
     waterVolInML = models.FloatField(default=5.0, validators=[MinValueValidator(1),MaxValueValidator(12),])
-    reagent1Slot = models.ForeignKey(ReagentSetup, related_name="reagent1", on_delete=models.CASCADE, null=True)
+    reagent1Slot = models.ForeignKey(ReagentSetup, related_name="reagent1", on_delete=models.CASCADE, null=True,blank=True)
     MEASUREMENT_CHOICES = (('drops', 'drops'), ('ml', 'ml'))
     reagent1DispenseType=models.CharField(max_length=6, choices=MEASUREMENT_CHOICES, default='drops', help_text="How to measure dispensing")
-    reagent1DispenseCount = models.FloatField(default=0, null=True, validators=[MinValueValidator(.05),MaxValueValidator(50)])
+    reagent1DispenseCount = models.FloatField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(50)])
     reagent1AgitateSecs = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(1000)])
     reagent2Slot = models.ForeignKey(ReagentSetup, related_name="reagent2", on_delete=models.CASCADE, null=True, blank=True)
     reagent2DispenseType=models.CharField(max_length=6, choices=MEASUREMENT_CHOICES, default='Drops', help_text="How to measure dispensing")
@@ -138,6 +129,11 @@ class TestDefinition(models.Model):
     reagent3AgitateSecs = models.IntegerField(default=0, null=True, validators=[MinValueValidator(0),MaxValueValidator(1000)])
     agitateMixtureSecs = models.IntegerField(default=0, validators=[MinValueValidator(0),MaxValueValidator(1000)])
     delayBeforeReadingSecs = models.IntegerField(default=0, validators=[MinValueValidator(0),MaxValueValidator(1000)])
+    titrationSlot = models.ForeignKey(ReagentSetup, related_name="titration", on_delete=models.CASCADE, null=True,blank=True)
+    titrationDispenseType=models.CharField(max_length=6, choices=MEASUREMENT_CHOICES, default='drops', help_text="How to measure dispensing")
+    titrationAgitateSecs = models.IntegerField(default=10, null=True, validators=[MinValueValidator(0),MaxValueValidator(1000)])
+    titrationTransition = models.FloatField(default=.5, null=True, validators=[MinValueValidator(0),MaxValueValidator(1)])
+    titrationMaxDispenses = models.FloatField(default=10, null=True, validators=[MinValueValidator(.05),MaxValueValidator(50)])
     colorChartToUse = models.ForeignKey(ColorSheetExternal, on_delete=models.CASCADE)
     tooLowAlarmThreshold = models.FloatField(default=None, null=True, blank=True)
     tooLowWarningThreshold = models.FloatField(default=None, null=True, blank=True)
@@ -150,6 +146,16 @@ class TestDefinition(models.Model):
     class Meta:
         ordering = ['testName']
         
+class HourChoices(models.Model):
+    hour = models.TimeField(unique=True, help_text="Tests are on hour boundaries")
+    
+    def __str__(self):
+        return str(self.hour)
+
+    class Meta:
+        ordering = ['hour']
+
+    
 class TestSchedule(models.Model):
     testToSchedule=models.CharField(max_length=40,null=True,blank=False,default='Dummy')
     enableSchedule = models.BooleanField(default=True)  
@@ -264,6 +270,7 @@ class JobEntry(models.Model):  #This field is used for display and no instances 
     class Meta:
         ordering = ['timeStamp']
         
+
         
         
     

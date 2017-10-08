@@ -30,7 +30,7 @@ import requests   # @UnresolvedImport
 import os
 import shutil
 from FishEyeWrapper import FishEye
-from ImageCheck import matchMarkers,evaluateColor,findLightingEnvironment
+from ImageCheck import matchMarkers,evaluateColor,evaluateColorBinary,findLightingEnvironment
 from Alarms import sendMeasurementReport,sendReagentAlarm,sendFillAlarm,sendDispenseAlarm,sendEvaluateAlarm,sendUnableToRotateAlarm,sendCannotOpenStoppersAlarm,sendCannotParkAlarm,sendOutOfLimitsAlarm,sendOutOfLimitsWarning
 from Learn import testFeature,insertTrainingGraphic,testDlibForVerticalPosition,testDlibForHorizontalPosition
 import sys
@@ -40,7 +40,7 @@ from random import randint
 import django
 import platform
 
-currentVersion='0.01'
+currentVersion='0.02'
 remoteControlThreadRPYC=None
 tester=None
 letterSequenceCheck={'A':'B','B':'C','C':'D','D':'E','E':'F','F':'G','G':'H','H':'I','I':'J','J':'K','K':'L','L':'A'}
@@ -447,6 +447,7 @@ def triggertester():
     
 def queuePlungerMove(tester,distanceToMove,speed=None):
     moveQueued=False
+    count=0
     while not moveQueued:
         tester.movePlungerLock.acquire()
         if tester.distanceToMovePlunger is None:
@@ -460,6 +461,7 @@ def queuePlungerMove(tester,distanceToMove,speed=None):
             tester.movePlungerLock.notify()
             tester.movePlungerLock.release()
             time.sleep(.5)
+            print(count)
     return True
 
 def markPlungerAsClosed(tester):
@@ -473,15 +475,17 @@ def movePlungerProcess():
     tester.distanceToMovePlunger=None
     while True:
         tester.movePlungerLock.acquire()
-        tester.movePlungerLock.wait()
         plungerMoveDistance=tester.distanceToMovePlunger
         plungerMoveSpeed=tester.speedToMovePlunger
-        if not plungerMoveDistance is None:
-            tester.plungerMoving=True
-            time.sleep(.1)
+        while plungerMoveDistance is None:
+            tester.movePlungerLock.wait(1)
+            plungerMoveDistance=tester.distanceToMovePlunger
+            plungerMoveSpeed=tester.speedToMovePlunger
+        tester.plungerMoving=True
+        time.sleep(.1)
 #            print('Dequeuer - move plunger: ' + str(plungerMoveDistance))
-            tester.movePlunger(plungerMoveDistance,speed=plungerMoveSpeed)
-            tester.plungerMoving=False
+        tester.movePlunger(plungerMoveDistance,speed=plungerMoveSpeed)
+        tester.plungerMoving=False
         tester.distanceToMovePlunger=None
         tester.movePlungerLock.release()
         
@@ -906,11 +910,16 @@ def testDrip(tester):
     kernel = np.ones((3,3),np.uint8)
     th2=cv2.erode(th1,kernel,iterations=1)
     (xList,yList)=np.nonzero(th2)
-    lowestPoint=max(xList)
+    try:
+        lowestPoint=max(xList)
+    except:
+        lowestPoint=0
+#    print('Lowest: ' + str(lowestPoint) + ', Size: ' + str(cntTop))
     return lowestPoint,cntTop
 
-def computeDripsFromLowestPoint(tester,newValue):
+def computeDripsFromLowestPoint(tester,newValue,sizeDelta=None):
     dripHeightThreshold=5
+    sizeDeltaThreshold=10
     initialSamplesToIgnore=10
     if tester.previousDripHeight is None:
         tester.previousDripHeight=newValue
@@ -922,7 +931,12 @@ def computeDripsFromLowestPoint(tester,newValue):
         if newValue-tester.previousDripHeight<=-dripHeightThreshold and tester.samplesSinceLastDrop>=tester.dripMinGap and tester.dripSampleCount>initialSamplesToIgnore:
             tester.previousDripHeight=newValue
             tester.samplesSinceLastDrop=0
-            return True
+            if sizeDelta is None:
+                return True
+            elif sizeDelta>=sizeDeltaThreshold:
+                return True
+            else:
+                return False
         else:
             tester.previousDripHeight=newValue
             tester.samplesSinceLastDrop+=1
@@ -949,6 +963,20 @@ def saveTopDripList(tester):
         index+=1
     tester.dripTopList=[]
 
+def getMaxPlungerDepth(reagent):
+    try:
+        rg=tester.reagentList[reagent]
+        if rg.hasAgitator:
+            plungerMaxDepth=-tester.plungerStepsPerMM*tester.maxPlungerDepthAgitator
+        else:
+            plungerMaxDepth=-tester.plungerStepsPerMM*tester.maxPlungerDepthNoAgitator
+    except:
+        tester.debugLog.exception("Trying to get max depth")        
+        plungerMaxDepth=-tester.plungerStepsPerMM*tester.maxPlungerDepthAgitator
+    stepsUntilMaxDepth=plungerMaxDepth-tester.plungerSteps
+    mmUntilMaxDepth=stepsUntilMaxDepth/tester.plungerStepsPerMM  
+    return plungerMaxDepth,mmUntilMaxDepth          
+        
 def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAsDiagnostic=False):
     plungerSlowDownThreshold=20
     initialSamplesToDiscard=10
@@ -964,9 +992,7 @@ def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAs
         originalDistortion=tester.undistortImage
         tester.undistortImage=False
         tester.suppressProcessing=True  #Turn off unecessary processing while in operation
-        plungerMaxDepth=-tester.plungerStepsPerMM*tester.maxPlungerDepthNoAgitator
-        stepsUntilMaxDepth=plungerMaxDepth-tester.plungerSteps
-        mmUntilMaxDepth=stepsUntilMaxDepth/tester.plungerStepsPerMM
+        plungerMaxDepth,mmUntilMaxDepth=getMaxPlungerDepth(reagent)
 #        print(mmUntilMaxDepth)
         if runAsDiagnostic:
             tester.debugLog.info('Starting to lower the plunger')
@@ -978,7 +1004,7 @@ def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAs
         collectedSampleIndex=0
         while tester.plungerSteps>plungerMaxDepth and dropCount<numDrops:
             dripTopValue,sizeChange=testDrip(tester)
-            dropDetected=computeDripsFromLowestPoint(tester,dripTopValue)
+            dropDetected=computeDripsFromLowestPoint(tester,dripTopValue,sizeDelta=sizeChange)
             if dropDetected:
                 dropCount+=1
             if sizeChange>plungerSlowDownThreshold and currentSpeedIsHigh and sampleCount>initialSamplesToDiscard:
@@ -1024,6 +1050,104 @@ def dispenseDrops(tester,numDrops,waitUntilPlungerRaised=True,reagent=None,runAs
             tester.debugLog.info("Failure Counting Drops")
         tester.debugLog.exception("Failure Counting Drops")        
     return False
+
+def dispenseFirstDrop(tester,reagent=None,runAsDiagnostic=False):
+    print('Dispensing first drop')
+    plungerSlowDownThreshold=20
+    initialSamplesToDiscard=10
+    log=""
+    try:
+        if tester.plungerSteps==None:
+            if runAsDiagnostic:
+                tester.debugLog.info('Plunger position must be initialized before dispensing Drops')
+            return False
+        resetDripHistory(tester)        #This assumes the reagent is in the front position
+        tester.suppressProcessing=True  #Turn off unecessary processing while in operation
+        plungerMaxDepth,mmUntilMaxDepth=getMaxPlungerDepth(reagent)
+#        print(mmUntilMaxDepth)
+        if runAsDiagnostic:
+            tester.debugLog.info('Starting to lower the plunger')
+        queuePlungerMove(tester,mmUntilMaxDepth,speed=tester.PLUNGER_HIGH_SPEED)
+        currentSpeedIsHigh=True
+        sampleCount=0
+        collectSamples=False
+        collectedSampleIndex=0
+        firstDropDispensed=False
+        while tester.plungerSteps>plungerMaxDepth:
+            dripTopValue,sizeChange=testDrip(tester)
+            dropDetected=computeDripsFromLowestPoint(tester,dripTopValue,sizeDelta=sizeChange)
+            if dropDetected:
+                firstDropDispensed=True
+                break
+            if sizeChange>plungerSlowDownThreshold and currentSpeedIsHigh and sampleCount>initialSamplesToDiscard:
+                tester.plungerSlow=True
+                currentSpeedIsHigh=False 
+                collectSamples=True
+                log=""
+            if collectSamples:
+                log+=str(collectedSampleIndex) + ',' + str(dripTopValue) + '\n'
+            sampleCount+=1
+        tester.plungerPause=True
+        tester.suppressProcessing=False
+        if runAsDiagnostic:
+            tester.debugLog.info('Processing reactivated')
+        if firstDropDispensed:
+            tester.debugLog.info('First drop dispensed')
+            return True
+        else:
+            tester.debugLog.info('Plunger Hit Max Depth before first drop dispensed')
+            return False
+    except:
+        if runAsDiagnostic:
+            tester.debugLog.info("Failure Dispensing")
+        tester.debugLog.exception("Failure Dispensing")        
+        return False
+
+def dispenseAnotherDrop(tester,reagent=None,runAsDiagnostic=False):
+    print('Dispensing next drop')
+    time.sleep(.5)
+    initialSamplesToDiscard=10
+    log=""
+    try:
+        if tester.plungerSteps==None:
+            if runAsDiagnostic:
+                tester.debugLog.info('Plunger position must be initialized before dispensing Drops')
+            return False
+        resetDripHistory(tester)        #This assumes the reagent is in the front position
+        tester.suppressProcessing=True  #Turn off unecessary processing while in operation
+#        print(mmUntilMaxDepth)
+        tester.plungerSlow=True
+        tester.plungerPause=True        
+        sampleCount=0
+        collectSamples=False
+        collectedSampleIndex=0
+        dropDispensed=False
+        sampleDiscardCount=0
+        plungerMaxDepth,mmUntilMaxDepth=getMaxPlungerDepth(reagent)
+        while tester.plungerSteps>plungerMaxDepth:
+            if sampleDiscardCount>initialSamplesToDiscard:
+                tester.plungerPause=False
+            sampleDiscardCount+=1
+            dripTopValue,sizeChange=testDrip(tester)
+            dropDetected=computeDripsFromLowestPoint(tester,dripTopValue,sizeDelta=sizeChange)
+            if dropDetected:
+                dropDispensed=True
+                break
+        tester.plungerPause=True
+        tester.suppressProcessing=False
+        if runAsDiagnostic:
+            tester.debugLog.info('Processing reactivated')
+        if dropDispensed:
+            tester.debugLog.info('Next drop dispensed')
+            return True
+        else:
+            tester.debugLog.info('Plunger Hit Max Depth before next drop dispensed')
+            return False
+    except:
+        if runAsDiagnostic:
+            tester.debugLog.info("Failure Dispensing")
+        tester.debugLog.exception("Failure Dispensing")        
+        return False
 
 def testRotation(tester,numOfDestinations):
     testNum=0
@@ -1557,11 +1681,22 @@ def evaluateResults(tester,colorChartToUse):
     tester.videoLowResCaptureLock.wait()
     imageCopy=tester.latestLowResImage.copy()
     tester.videoLowResCaptureLock.release()
-    bestValue=evaluateColor(tester,imageCopy,colorChartToUse)
-    if bestValue<0:
-        bestValue=0
-    tester.infoMessage('Result was: ' + str(bestValue)) 
-    return bestValue
+    rs=evaluateColor(tester,imageCopy,colorChartToUse)
+    if rs.valueAtSwatch<0:
+        rs.valueAtSwatch=0
+    tester.infoMessage('Result was: ' + str(rs.valueAtSwatch)) 
+    return rs
+
+def evaluateResultsBinary(tester,colorChartToUse):
+    tester.videoLowResCaptureLock.acquire()
+    tester.videoLowResCaptureLock.wait()
+    imageCopy=tester.latestLowResImage.copy()
+    tester.videoLowResCaptureLock.release()
+    rs=evaluateColorBinary(tester,imageCopy,colorChartToUse)
+    if rs.valueAtSwatch<0:
+        rs.valueAtSwatch=0
+    tester.infoMessage('Result was: ' + str(rs.valueAtSwatch)) 
+    return rs
 
 def checkTestRange(tester,ts,results):
     alarmSent=False
@@ -1638,6 +1773,140 @@ def runTestStep(tester,testStepNumber,testName,waterVolInML,reagentSlot,agitateS
     except:
         tester.debugLog.exception('Failure when running Test Step ' + str(testStepNumber))
         return False
+    
+def getDirectReadResults(tester,ts,sequenceName):
+    testSucceeded=True
+    results=None
+    tester.colorTable=tester.colorSheetList[ts.colorChartToUse].generateColorTableDisplay(tester)        
+    if ts.agitateMixtureSecs>0:
+        tester.testStatus='Agitating the Mixture for ' + str(ts.agitateMixtureSecs) + ' secs.'
+        agitatorStart(tester)
+        time.sleep(ts.agitateMixtureSecs)
+        agitatorStop(tester)
+    timeRemaining=ts.delayBeforeReadingSecs-ts.agitateMixtureSecs
+    while timeRemaining>0:
+        tester.testStatus='Waiting ' + str(timeRemaining) + ' secs before reading mixture.'
+        time.sleep(1)
+        timeRemaining-=1
+    try:
+        rs=evaluateResults(tester,ts.colorChartToUse)
+        results=rs.valueAtSwatch
+        tester.testStatus='Test results are: %.2f' % results
+        tester.saveTestResults(results,swatchResultList=[rs])
+        tester.infoMessage('Completed Test ' + sequenceName + ', Results were: %.2f' % results)
+        if tester.sendMeasurementReports and not tester.iftttSecretKey is None:
+            sendMeasurementReport(tester,sequenceName,results)
+    except:
+        testSucceeded=False
+        sendEvaluateAlarm(tester,sequenceName,tester.currentLightingConditions)
+        tester.debugLog.exception("Failure evaluating")
+    checkTestRange(tester,ts,results)
+    time.sleep(tester.pauseInSecsBeforeEmptyingMixingChamber)
+    if testSucceeded:
+        tester.testStatus='Result was: %.2f' % results + ' - Emptying chamber'
+    else:
+        tester.testStatus='Test Failed'
+    tester.openMixerValve()
+    time.sleep(4)
+    return results
+
+def runTitration(tester,ts,sequenceName):
+    originalDistortion=tester.undistortImage
+    try:
+        tester.infoMessage('Rotating to Titration Reagent') 
+        tester.testStatus='Rotating to Titration Reagent'
+        success=rotateToPosition(tester,ts.titrationSlot)
+        if not success:
+            tester.debugMessage('Unable to Rotate to Titration Reagent')
+            sendUnableToRotateAlarm(tester,ts.titrationSlot,testName)
+            return False
+        if ts.agitateMixtureSecs>0:
+            tester.testStatus='Agitating the Mixture for ' + str(ts.agitateMixtureSecs) + ' secs.'
+            agitatorStart(tester)
+            time.sleep(ts.agitateMixtureSecs)
+            agitatorStop(tester)
+        remainingWaitTime=ts.delayBeforeReadingSecs-ts.agitateMixtureSecs
+        if remainingWaitTime>0:
+            tester.testStatus='Waiting for ' + str(remainingWaitTime) + ' secs before beginning titration.'
+            time.sleep(remainingWaitTime)
+        dispenseCount=0
+        colorResultsList=[]
+        gotInitialDrop=False
+        testSucceeded=False
+        tester.undistortImage=False
+        while dispenseCount<=ts.titrationMaxDispenses:
+            tester.testStatus='Processing with dispense = ' + str(dispenseCount)
+            if ts.titrationAgitateSecs>0:
+                agitatorStart(tester)
+                time.sleep(ts.titrationAgitateSecs)
+                agitatorStop(tester)
+            rs=evaluateResultsBinary(tester,ts.colorChartToUse)
+            rs.swatchDropCount=dispenseCount
+            colorResultsList.append(rs)
+            print('Observed Value = ' + str(rs.valueAtSwatch))
+            if rs.valueAtSwatch>=ts.titrationTransition:
+                testSucceeded=True
+                break
+            if dispenseCount==0:
+                result=dispenseFirstDrop(tester,reagent=ts.titrationSlot,runAsDiagnostic=False)
+                if not result:
+                    break 
+            else:
+                result=dispenseAnotherDrop(tester,reagent=ts.titrationSlot,runAsDiagnostic=False)
+                if not result:
+                    break
+                gotInitialDrop=True
+            dispenseCount+=1 
+        print('Exited')          
+        tester.plungerSlow=False
+        tester.suppressProcessing=False
+        tester.undistortImage=originalDistortion
+        tester.plungerAbort=True
+        tester.plungerPause=False
+        time.sleep(1)
+        tester.plungerAbort=False
+        try:
+            if testSucceeded:
+                results=dispenseCount
+                tester.testStatus='Test results are: ' + str(dispenseCount)
+                tester.saveTestResults(results,swatchResultList=colorResultsList)
+                tester.infoMessage('Completed Test ' + sequenceName + ', Results were: ' + str(dispenseCount))
+                if tester.sendMeasurementReports and not tester.iftttSecretKey is None:
+                    sendMeasurementReport(tester,sequenceName,dispenseCount)
+                checkTestRange(tester,ts,dispenseCount)
+            elif dispenseCount>ts.titrationMaxDispenses:
+                results=None
+                tester.saveTestResults(results,swatchResultList=colorResultsList)
+                sendEvaluateAlarm(tester,sequenceName,tester.currentLightingConditions)
+                tester.debugLog.exception("Max drops dispensed before hitting transition")
+            else:
+                sendEvaluateAlarm(tester,sequenceName,tester.currentLightingConditions)
+                tester.debugLog.exception("Failure evaluating")                
+        except:
+            testSucceeded=False
+            sendEvaluateAlarm(tester,sequenceName,tester.currentLightingConditions)
+            tester.debugLog.exception("Failure evaluating")
+        time.sleep(tester.pauseInSecsBeforeEmptyingMixingChamber)
+        tester.openMixerValve()
+        if tester.lastReagentRemainingML<tester.reagentRemainingMLAlarmThreshold and tester.reagentAlmostEmptyAlarmEnable:
+            sendReagentAlarm(tester,ts.titrationSlot,tester.lastReagentRemainingML)
+        tester.infoMessage('Retracting plunger') 
+        tester.testStatus='Retracting plunger'
+        liftPlungerUntilExactlyOpen(tester,blockUntilDone=False)
+        return results
+    except:
+        tester.plungerSlow=False
+        tester.suppressProcessing=False
+        tester.undistortImage=originalDistortion
+        tester.plungerAbort=True
+        tester.plungerPause=False
+        time.sleep(1)
+        tester.plungerAbort=False
+        tester.openMixerValve()
+        tester.debugLog.exception('Failure when running Titration Step')
+        liftPlungerUntilExactlyOpen(tester,blockUntilDone=False)
+        return None
+    
 
 def runTestSequence(tester,sequenceName):
     tester.systemStatus="Running Test"
@@ -1655,6 +1924,8 @@ def runTestSequence(tester,sequenceName):
             numSteps+=1
         if not ts.reagent3Slot is None:
             numSteps+=1
+        if not ts.titrationSlot is None:
+            numSteps+=1
         tester.testStatus='Making Sure Stoppers are Open'
         success=setPlungerToOpen(tester)
         if not success:
@@ -1662,7 +1933,7 @@ def runTestSequence(tester,sequenceName):
             tester.systemStatus="Fault"
             return False
         waitUntilPlungerStopsMoving(tester)
-        testSucceeded=False
+        testSucceeded=True
         if not ts.reagent1Slot is None and ts.reagent1DispenseCount>0:
             success=runTestStep(tester,1,sequenceName,ts.waterVolInML,ts.reagent1Slot,ts.reagent1AgitateSecs,ts.reagent1DispenseType,ts.reagent1DispenseCount,lastStep=numSteps==1)
             testSucceeded=success
@@ -1675,36 +1946,14 @@ def runTestSequence(tester,sequenceName):
         if testSucceeded and not tester.abortJob:
             findLightingEnvironment(tester)
             tester.testStatus='Lighting Environment is ' + tester.currentLightingConditions
-            tester.colorTable=tester.colorSheetList[ts.colorChartToUse].generateColorTableDisplay(tester)        
-            if ts.agitateMixtureSecs>0:
-                tester.testStatus='Agitating the Mixture for ' + str(ts.agitateMixtureSecs) + ' secs.'
-                agitatorStart(tester)
-                time.sleep(ts.agitateMixtureSecs)
-                agitatorStop(tester)
-            timeRemaining=ts.delayBeforeReadingSecs-ts.agitateMixtureSecs
-            while timeRemaining>0:
-                tester.testStatus='Waiting ' + str(timeRemaining) + ' secs before reading mixture.'
-                time.sleep(1)
-                timeRemaining-=1
-            try:
-                results=evaluateResults(tester,ts.colorChartToUse)
-                tester.testStatus='Test results are: %.2f' % results
-                tester.saveTestResults(results)
-                tester.infoMessage('Completed Test ' + sequenceName + ', Results were: %.2f' % results)
-                if tester.sendMeasurementReports and not tester.iftttSecretKey is None:
-                    sendMeasurementReport(tester,sequenceName,results)
-            except:
-                testSucceeded=False
-                sendEvaluateAlarm(tester,sequenceName,tester.currentLightingConditions)
-                tester.debugLog.exception("Failure evaluating")
-            checkTestRange(tester,ts,results)
-            time.sleep(tester.pauseInSecsBeforeEmptyingMixingChamber)
-            if testSucceeded:
-                tester.testStatus='Result was: %.2f' % results + ' - Emptying chamber'
+            if ts.titrationSlot is None:
+                results=getDirectReadResults(tester,ts,sequenceName)
+                if results is None:
+                    testSucceeded=False
             else:
-                tester.testStatus='Test Failed'
-            tester.openMixerValve()
-            time.sleep(4)
+                results=runTitration(tester,ts,sequenceName)
+                if results is None:
+                    testSucceeded=False
         else:
              tester.saveTestSaveBadResults()
         if not tester.anyMoreJobs():
@@ -1742,23 +1991,8 @@ def runTestSequence(tester,sequenceName):
     tester.systemStatus="Idle"
     return testSucceeded
 
-
 def dailyMaintenance():
-    #perform maintenance at 2am
-    startTime=datetime.datetime.now()
-    midnight=datetime.datetime(startTime.year, startTime.month, startTime.day)
-    shiftLater=datetime.timedelta(hours=2)
-    lastWakeupTime=midnight+shiftLater
-    normalInterval=datetime.timedelta(days=1)
-    nextNormalWakeupTime=lastWakeupTime+normalInterval
-    while True:
-        lastWakeupTime=sleepUntilNextInterval(lastWakeupTime,tester.expeditedRecordIntervalInSecs)
-        if datetime.datetime.now()>nextNormalWakeupTime:
-            nextNormalWakeupTime=nextNormalWakeupTime+normalInterval
-            try:
-                tester.removeOldTimesliceRecordsFromDB()
-            except:
-                tester.debugLog.exception("Continuing...")  
+    tester.removeOldRecords()
                 
 def alertUser(alertCode,alertText,variable):
     tester.testerLog.info(alertText + str(variable))
@@ -1861,6 +2095,7 @@ def resetJobSchedules():
             setJobSchedules(ts) 
         except:
             pass 
+    schedule.every().day.at('02:00').do(dailyMaintenance).tag('Maintenance')
 
 def testerJobScheduler():
     resetJobSchedules()

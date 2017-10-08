@@ -19,7 +19,7 @@ from django.forms import formset_factory
 from django.forms.models import modelformset_factory
 from TesterCore import getBasePath
 from django.contrib.auth.decorators import login_required
-from django.utils.timezone import activate
+#from django.utils.timezone import activate
 import time
 import glob
 import os
@@ -88,16 +88,12 @@ def home(request,formResult):
     if formToProcess == 'queueJob':
         try:
             te=TesterExternal.objects.get(pk=1)
-            tzString=te.currentTimeZone
-            try:
-                activate(tzString)
-            except:
-                pass
             newJob=JobExternal()
             newJob.jobToRun=TestDefinition.objects.get(testName=testSequenceNameToRun)
             newJob.save()
 #                return HttpResponseRedirect('run')
         except: 
+            traceback.print_exc()
             print('Key error:' + testSequenceNameToRun)
     if formToProcess == 'updateQueue':
         print(updateQueueAction)
@@ -137,7 +133,10 @@ def home(request,formResult):
         newJob=JobEntry()
         newJob.jobName=result.testPerformed
         if result.status=='Completed':
-            newJob.jobText='Completed (' + str(round(result.results,2)) + ')'
+            if result.results is None:
+                newJob.jobText ='Failed'
+            else:
+                newJob.jobText='Completed (' + str(round(result.results,2)) + ')'
         elif result.status=='Failed':
             newJob.jobText='Failed'
         else:
@@ -467,6 +466,7 @@ def testdef(request,formResult):
             testDefList=TestDefinition.objects.all()
             try:
                 TestSchedule.objects.get(testToSchedule=testToChange).delete()
+                sendCmdToTester('RELOAD/TestDefs')           
             except:
                 pass
             context={'testDefList':testDefList}
@@ -498,10 +498,14 @@ def testdef(request,formResult):
                 elif testDefToSave.reagent3DispenseType=='drops' and (testDefToSave.reagent3DispenseCount-int(testDefToSave.reagent3DispenseCount)>0):
                     messages.error(request,'Reagent1 must be an integer number of drops')
                     retryTestSetup=True
+                elif testDefToSave.titrationDispenseType=='drops' and (testDefToSave.titrationMaxDispenses-int(testDefToSave.titrationMaxDispenses)>0):
+                    messages.error(request,'Titration Max must be an integer number of drops')
+                    retryTestSetup=True
                 else:
                 #We saved the new or changed test def.  Now update any schedule objects
                     testDefToSave.save()
                     testDef.save_m2m()
+                    sendCmdToTester('RELOAD/TestDefs')           
                     messages.success(request,'Test ' + testDefToSave.testName + ' saved')
                     if originalTestName=='New Test':
                         newTestSched=TestSchedule()
@@ -552,6 +556,7 @@ def reagent(request,formResult):
         if reagFormSet.is_valid():
             if whatToDoWithFormset=='UPDATE':
                 reagFormSet.save()            
+                sendCmdToTester('RELOAD/Reagents')           
                 messages.success(request,'Reagents updated')
         else:
             messages.error(request,reagFormSet.errors)

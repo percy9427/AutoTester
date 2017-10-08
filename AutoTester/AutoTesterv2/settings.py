@@ -107,7 +107,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'US/Central'
+from tzlocal import get_localzone #@undefined import
+
+TIME_ZONE = str(get_localzone())
 
 USE_I18N = True
 

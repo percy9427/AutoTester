@@ -20,6 +20,7 @@ import datetime
 import random
 import warnings
 import traceback
+import operator
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 warnings.filterwarnings("ignore", category=FutureWarning) 
 
@@ -370,7 +371,7 @@ class colorSheet:
             swatchTableEndRow=self.tableStartPosition+(swatch.swatchRow)*self.tableRowHeight
             if yCoordRaw>=swatchTableStartRow and yCoordRaw<swatchTableEndRow and xCoordRaw<self.tableWidth:
                 return swatch.swatchRow
-        return None
+        return None    
     
 class swatch:
     def __init__(self,name):
@@ -406,6 +407,54 @@ class swatch:
             font = cv2.FONT_HERSHEY_SIMPLEX        
             cv2.putText(bgrImage,str(self.valueAtSwatch),(int(width/2-20),int(height/2)+10), font, .75,(0,0,0),2,cv2.LINE_AA)
         return bgrImage   
+    
+class resultsSwatch:
+    def __init__(self):
+        self.swatchDropCount=None
+        self.valueAtSwatch=0
+        self.lightingConditions='LED'
+        self.channel1=0
+        self.channel2=0
+        self.channel3=0
+        
+    def generateSwatchImage(self):
+        if self.swatchDropCount is None:
+            dropStr='' 
+        else:
+            dropStr='Drop: ' + str(self.swatchDropCount) + ': '  
+        swatchStr=dropStr+ str(round(self.valueAtSwatch,2))  
+        rowSize=30
+        colSize=200
+        labBlock=np.ones((rowSize,colSize,3),dtype=np.float32)
+        labBlock[:,:,0]=self.channel1
+        labBlock[:,:,1]=self.channel2
+        labBlock[:,:,2]=self.channel3
+        bgrImage=cv2.cvtColor(labBlock,cv2.COLOR_Lab2BGR)*255
+        font = cv2.FONT_HERSHEY_SIMPLEX 
+        cv2.putText(bgrImage,swatchStr,(10,20), font, .7,(0,0,0),2,cv2.LINE_AA)
+        return bgrImage
+
+    def generateSwatchResultList(self,resultSwatchList):
+        dropsIsNone=False
+        totalNumRows=0
+        for rs in resultSwatchList:
+            swatchImage=rs.generateSwatchImage()
+            numRows,numCols,numChannels=swatchImage.shape
+            totalNumRows+=numRows
+            if rs.swatchDropCount is None:
+                dropsIsNone=True
+        listStruct=np.zeros((totalNumRows,numCols,3),dtype=np.float32)
+        currentRow=0
+        if dropsIsNone:
+            sortedResultList=sorted(resultSwatchList,key=operator.attrgetter('valueAtSwatch'))
+        else:
+            sortedResultList=sorted(resultSwatchList,key=operator.attrgetter('swatchDropCount'))    
+        for rs in sortedResultList:
+            swatchImage=rs.generateSwatchImage()
+            numRows,numCols,numChannels=swatchImage.shape
+            listStruct[currentRow:currentRow+numRows,:,:]=swatchImage
+            currentRow+=numRows
+        return listStruct
 
 def matchMarkers(image,tester):
     bwImage=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
@@ -549,7 +598,73 @@ def findClosestSwatchMatch(tester,colorSheetName,l,a,b):
 def evaluateColor(tester,image,colorSheetName):
     l,a,b=getLABValuesOfColorCheckRegion(tester,image)
     closestValue=findClosestSwatchMatch(tester,colorSheetName,l,a,b)
-    return closestValue
+    resultSwatch=resultsSwatch()
+    resultSwatch.swatchDropCount=None
+    resultSwatch.valueAtSwatch=closestValue
+    resultSwatch.lightingConditions='LED'
+    resultSwatch.channel1=l
+    resultSwatch.channel2=a
+    resultSwatch.channel3=b
+    return resultSwatch
+
+def prepareBinaryMatchCandidateList(tester,colorSheetName):
+    #this assumes that the swatches are numbered in linear and consecutive number (run a quick check)
+    try:
+        consecutive=True
+        enoughSamples=True
+        i=1
+        for swatchRowAndCondition in sorted(tester.colorSheetList[colorSheetName].swatchList):
+            potentialSwatch=tester.colorSheetList[colorSheetName].swatchList[swatchRowAndCondition]
+            if potentialSwatch.lightingConditions==tester.currentLightingConditions:
+                if not potentialSwatch.swatchRow==i:
+                    consecutive=False
+                i+=1
+        if i<2:
+            enoughSamples=False
+        if not consecutive:
+            tester.debugLog.info('Aborting because swatches for color sheet: ' + colorSheetName + ' are not consecutive')
+        if not enoughSamples:
+            tester.debugLog.info('Aborting because there are <2 swatches for color sheet: ' + colorSheetName)
+#        currentSwatchNumber=1
+#        currentSwatch=tester.colorSheetList[colorSheetName].swatchList[str(currentSwatchNumber) + '/' + tester.currentLightingConditions]
+        startChannel1=tester.colorSheetList[colorSheetName].swatchList['1/' + tester.currentLightingConditions].channel1
+        startChannel2=tester.colorSheetList[colorSheetName].swatchList['1/' + tester.currentLightingConditions].channel2
+        startChannel3=tester.colorSheetList[colorSheetName].swatchList['1/' + tester.currentLightingConditions].channel3
+        startValue=tester.colorSheetList[colorSheetName].swatchList['1/' + tester.currentLightingConditions].valueAtSwatch
+        candidateList=[]
+        endChannel1=tester.colorSheetList[colorSheetName].swatchList['2/' + tester.currentLightingConditions].channel1
+        endChannel2=tester.colorSheetList[colorSheetName].swatchList['2/' + tester.currentLightingConditions].channel2
+        endChannel3=tester.colorSheetList[colorSheetName].swatchList['2/' + tester.currentLightingConditions].channel3
+        endValue=tester.colorSheetList[colorSheetName].swatchList['2/' + tester.currentLightingConditions].valueAtSwatch
+        addIntermediateValues(startChannel1,startChannel2,startChannel3,startValue,endChannel1,endChannel2,endChannel3,endValue,candidateList,increments=100)
+        candidateList.append([endChannel1,endChannel2,endChannel3,endValue])
+    except:
+        tester.debugLog.exception("Creating candidates...") 
+    return candidateList 
+  
+def findClosestBinarySwatchMatch(tester,colorSheetName,l,a,b):
+    minDistance=99999
+    closestSwath=None
+    closestIndex=0
+    candidateList=prepareBinaryMatchCandidateList(tester,colorSheetName)
+    for labValues in candidateList:
+        swatchDistance=getLABDistance(l,a,b,labValues[0],labValues[1],labValues[2])
+        if swatchDistance<minDistance:
+            closestValue=labValues[3]
+            minDistance=swatchDistance
+    return  closestValue
+        
+def evaluateColorBinary(tester,image,colorSheetName):
+    l,a,b=getLABValuesOfColorCheckRegion(tester,image)
+    closestValue=findClosestBinarySwatchMatch(tester,colorSheetName,l,a,b)
+    resultSwatch=resultsSwatch()
+    resultSwatch.swatchDropCount=None
+    resultSwatch.valueAtSwatch=closestValue
+    resultSwatch.lightingConditions='LED'
+    resultSwatch.channel1=l
+    resultSwatch.channel2=a
+    resultSwatch.channel3=b
+    return resultSwatch
 
 def findLightingEnvironment(tester):    
     tester.videoLowResCaptureLock.acquire()

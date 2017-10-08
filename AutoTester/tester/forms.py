@@ -70,7 +70,7 @@ class TestDefinitionForm(forms.ModelForm):
 class TesterForm(forms.ModelForm):
     class Meta:
         model = TesterExternal
-        exclude=('testerVersion','dbModelVersion','lensType','fisheyeExpansionFactor','cameraWidthLowRes','cameraHeightLowRes', \
+        exclude=('lensType','fisheyeExpansionFactor','cameraWidthLowRes','cameraHeightLowRes', \
                  'tooDarkThreshold','measurementUnits','pumpPurgeTimeSeconds','pauseInSecsBeforeEmptyingMixingChamber')
 
     def __init__(self, *args, **kwargs):
@@ -78,6 +78,12 @@ class TesterForm(forms.ModelForm):
         if self.instance.id:
             self.fields['testerName'].label="Name of the Tester"
             self.fields['testerName'].widget.attrs['title'] = "This is the name of the AutoTester.  It will be sent in notifications"
+            self.fields['testerVersion'].label="Software Version"
+            self.fields['testerVersion'].widget.attrs['title'] = "This is the software version"
+            self.fields['testerVersion'].widget.attrs['readonly'] = True
+            self.fields['dbModelVersion'].label="Database Version"
+            self.fields['dbModelVersion'].widget.attrs['title'] = "This is the version of the database"
+            self.fields['dbModelVersion'].widget.attrs['readonly'] = True
             self.fields['virtualEnvironmentName'].label="Virtual Environment Name"
             self.fields['virtualEnvironmentName'].widget.attrs['title'] = "The name of the virtual environment that the program runs under"
             self.fields['webPort'].label="WebServer Port"
@@ -106,8 +112,8 @@ class TesterForm(forms.ModelForm):
             self.fields['iftttSecretKey'].widget.attrs['title'] = "Set the secret key for sending alarms or reports"
             self.fields['sendMeasurementReports'].label="Enable Measurement Reports"
             self.fields['sendMeasurementReports'].widget.attrs['title'] = "Check if you want a notification each time a test is run"
-            self.fields['currentTimeZone'].label="Set Current TimeZone"
-            self.fields['currentTimeZone'].widget.attrs['title'] = "Set the timezone of the program"
+            self.fields['daysOfResultsToKeep'].label="Days of Historical Results to Keep"
+            self.fields['daysOfResultsToKeep'].widget.attrs['title'] = "Enter number of days of old results to keep"
             self.fields['stopperTighteningInMM'].label="Stopper Tightening Amount"
             self.fields['stopperTighteningInMM'].widget.attrs['title'] = "AutoTester detects when the stoppers begin to lift the carousel.  This is how many mm past that point to go to tighten the stoppers"
             self.fields['enableConsoleOutput'].label="Enable Console Output"

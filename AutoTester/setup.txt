@@ -63,6 +63,7 @@ pip install joblib
 pip install rpi.gpio
 pip install requests
 pip install picamera
+pip install tzlocal
 
 Step 10. We need to copy in the autotester software.  This should be done within the virtual environment (cv)
 cd ~

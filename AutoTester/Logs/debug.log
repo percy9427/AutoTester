@@ -1,69 +1,81 @@
-2017-09-24 11:27:10,027 - MainThread - Thread: Run Test started
-2017-09-24 11:27:10,309 - MainThread - Thread: Job Scheduler started
-2017-09-24 11:27:10,310 - MainThread - Thread: Diagnostics started
-2017-09-24 11:27:10,311 - MainThread - Tester Server version 0.01 loaded
-2017-09-24 11:27:10,312 - Job Scheduler - Days to run for Ph-API was Never
-2017-09-24 11:27:10,314 - Job Scheduler - Days to run for PhHigh-API was Never
-2017-09-24 11:27:10,316 - Job Scheduler - Days to run for Nitrate-API was Never
-2017-09-24 11:27:10,318 - Job Scheduler - Days to run for Ammonia-API was Never
-2017-09-24 11:27:10,320 - Job Scheduler - Days to run for Nitrite-API was Never
-2017-09-24 11:28:45,518 - MainThread - Camera Model Loaded
-2017-09-24 11:28:45,518 - MainThread - Tester Engine version 0.03 loaded
-2017-09-24 11:28:48,124 - MainThread - Thread: Video Grabber started
-2017-09-24 11:28:48,126 - MainThread - Thread: Video Streamer started
-2017-09-24 11:28:48,127 - MainThread - Thread: Capture Images started
-2017-09-24 11:28:48,130 - MainThread - Thread: Move Plunger started
-2017-09-24 11:28:48,132 - MainThread - Thread: Move Carousel started
-2017-09-24 11:28:48,134 - MainThread - Thread: Series Capture started
-2017-09-24 11:28:48,136 - Orient Tester - Orientation Skipped
-2017-09-24 11:28:48,137 - MainThread - Thread: Orient Tester started
-2017-09-24 11:28:48,139 - MainThread - Thread: Agitator Run started
-2017-09-24 11:28:48,144 - MainThread - Thread: Run Test started
-2017-09-24 11:28:48,148 - MainThread - Thread: Job Scheduler started
-2017-09-24 11:28:48,150 - MainThread - Thread: Diagnostics started
-2017-09-24 11:28:48,151 - MainThread - Tester Server version 0.01 loaded
-2017-09-24 11:28:48,152 - Job Scheduler - Days to run for Ph-API was Never
-2017-09-24 11:28:48,153 - Job Scheduler - Days to run for PhHigh-API was Never
-2017-09-24 11:28:48,155 - Job Scheduler - Days to run for Nitrite-API was Never
-2017-09-24 11:28:48,156 - Job Scheduler - Days to run for Nitrate-API was Never
-2017-09-24 11:28:48,157 - Job Scheduler - Days to run for Ammonia-API was Never
-2017-09-24 11:30:17,950 - MainThread - Camera Model Loaded
-2017-09-24 11:30:17,951 - MainThread - Tester Engine version 0.03 loaded
-2017-09-24 11:30:20,546 - MainThread - Thread: Video Grabber started
-2017-09-24 11:30:20,547 - MainThread - Thread: Video Streamer started
-2017-09-24 11:30:20,549 - MainThread - Thread: Capture Images started
-2017-09-24 11:30:20,553 - MainThread - Thread: Move Plunger started
-2017-09-24 11:30:20,554 - MainThread - Thread: Move Carousel started
-2017-09-24 11:30:20,556 - MainThread - Thread: Series Capture started
-2017-09-24 11:30:20,559 - Orient Tester - Orientation Skipped
-2017-09-24 11:30:20,559 - MainThread - Thread: Orient Tester started
-2017-09-24 11:30:20,562 - MainThread - Thread: Agitator Run started
-2017-09-24 11:30:20,568 - MainThread - Thread: Run Test started
-2017-09-24 11:30:20,572 - MainThread - Thread: Job Scheduler started
-2017-09-24 11:30:20,575 - MainThread - Thread: Diagnostics started
-2017-09-24 11:30:20,575 - MainThread - Tester Server version 0.01 loaded
-2017-09-24 11:30:20,577 - Job Scheduler - Days to run for Ammonia-API was Never
-2017-09-24 11:30:20,579 - Job Scheduler - Days to run for Ph-API was Never
-2017-09-24 11:30:20,582 - Job Scheduler - Days to run for Nitrate-API was Never
-2017-09-24 11:30:20,583 - Job Scheduler - Days to run for PhHigh-API was Never
-2017-09-24 11:30:20,585 - Job Scheduler - Days to run for Nitrite-API was Never
-2017-09-24 15:58:03,542 - MainThread - Camera Model Loaded
-2017-09-24 15:58:03,543 - MainThread - Tester Engine version 0.03 loaded
-2017-09-24 15:58:06,415 - MainThread - Thread: Video Grabber started
-2017-09-24 15:58:06,416 - MainThread - Thread: Video Streamer started
-2017-09-24 15:58:06,416 - MainThread - Thread: Capture Images started
-2017-09-24 15:58:06,418 - MainThread - Thread: Move Plunger started
-2017-09-24 15:58:06,419 - MainThread - Thread: Move Carousel started
-2017-09-24 15:58:06,420 - MainThread - Thread: Series Capture started
-2017-09-24 15:58:06,420 - Orient Tester - Orientation Skipped
-2017-09-24 15:58:06,421 - MainThread - Thread: Orient Tester started
-2017-09-24 15:58:06,422 - MainThread - Thread: Agitator Run started
-2017-09-24 15:58:06,424 - MainThread - Thread: Run Test started
-2017-09-24 15:58:06,426 - MainThread - Thread: Job Scheduler started
-2017-09-24 15:58:06,427 - MainThread - Thread: Diagnostics started
-2017-09-24 15:58:06,427 - MainThread - Tester Server version 0.01 loaded
-2017-09-24 15:58:06,428 - Job Scheduler - Days to run for Nitrate-API was Never
-2017-09-24 15:58:06,429 - Job Scheduler - Days to run for PhHigh-API was Never
-2017-09-24 15:58:06,430 - Job Scheduler - Days to run for Ammonia-API was Never
-2017-09-24 15:58:06,431 - Job Scheduler - Days to run for Ph-API was Never
-2017-09-24 15:58:06,432 - Job Scheduler - Days to run for Nitrite-API was Never
+2017-10-07 15:04:13,309 - MainThread - Thread: Video Grabber started
+2017-10-07 15:04:13,317 - MainThread - Thread: Video Streamer started
+2017-10-07 15:04:13,318 - MainThread - Thread: Capture Images started
+2017-10-07 15:04:13,319 - MainThread - Thread: Move Plunger started
+2017-10-07 15:04:13,320 - MainThread - Thread: Move Carousel started
+2017-10-07 15:04:13,321 - MainThread - Thread: Series Capture started
+2017-10-07 15:04:13,321 - Orient Tester - Orientation Skipped
+2017-10-07 15:04:13,322 - MainThread - Thread: Orient Tester started
+2017-10-07 15:04:13,323 - MainThread - Thread: Agitator Run started
+2017-10-07 15:04:13,326 - MainThread - Thread: Run Test started
+2017-10-07 15:04:13,329 - MainThread - Thread: Job Scheduler started
+2017-10-07 15:04:13,330 - MainThread - Thread: Diagnostics started
+2017-10-07 15:04:13,331 - MainThread - Thread: Daily Maintenance started
+2017-10-07 15:04:13,331 - MainThread - Tester Server version 0.01 loaded
+2017-10-07 15:04:13,332 - Job Scheduler - Days to run for Nitrate-API was Never
+2017-10-07 15:04:13,333 - Job Scheduler - Days to run for Nitrite-API was Never
+2017-10-07 15:04:13,334 - Job Scheduler - Days to run for Ammonia-API was Never
+2017-10-07 15:04:13,335 - Job Scheduler - Days to run for PhHigh-API was Never
+2017-10-07 15:04:13,336 - Job Scheduler - Days to run for Ph-API was Never
+2017-10-07 15:14:16,257 - MainThread - Camera Model Loaded
+2017-10-07 15:14:16,257 - MainThread - Tester Engine version 0.03 loaded
+2017-10-07 15:14:18,881 - MainThread - Thread: Video Grabber started
+2017-10-07 15:14:18,881 - MainThread - Thread: Video Streamer started
+2017-10-07 15:14:18,882 - MainThread - Thread: Capture Images started
+2017-10-07 15:14:18,883 - MainThread - Thread: Move Plunger started
+2017-10-07 15:14:18,885 - MainThread - Thread: Move Carousel started
+2017-10-07 15:14:18,885 - MainThread - Thread: Series Capture started
+2017-10-07 15:14:18,886 - Orient Tester - Orientation Skipped
+2017-10-07 15:14:18,886 - MainThread - Thread: Orient Tester started
+2017-10-07 15:14:18,887 - MainThread - Thread: Agitator Run started
+2017-10-07 15:14:18,890 - MainThread - Thread: Run Test started
+2017-10-07 15:14:18,892 - MainThread - Thread: Job Scheduler started
+2017-10-07 15:14:18,893 - MainThread - Thread: Diagnostics started
+2017-10-07 15:14:18,894 - MainThread - Thread: Daily Maintenance started
+2017-10-07 15:14:18,894 - MainThread - Tester Server version 0.01 loaded
+2017-10-07 15:14:18,895 - Job Scheduler - Days to run for Nitrite-API was Never
+2017-10-07 15:14:18,895 - Job Scheduler - Days to run for Ammonia-API was Never
+2017-10-07 15:14:18,897 - Job Scheduler - Days to run for Nitrate-API was Never
+2017-10-07 15:14:18,898 - Job Scheduler - Days to run for PhHigh-API was Never
+2017-10-07 15:14:18,899 - Job Scheduler - Days to run for Ph-API was Never
+2017-10-08 10:06:25,427 - MainThread - Camera Model Loaded
+2017-10-08 10:06:25,428 - MainThread - Tester Engine version 0.04 loaded
+2017-10-08 10:06:28,251 - MainThread - Thread: Video Grabber started
+2017-10-08 10:06:28,252 - MainThread - Thread: Video Streamer started
+2017-10-08 10:06:28,255 - MainThread - Thread: Capture Images started
+2017-10-08 10:06:28,257 - MainThread - Thread: Move Plunger started
+2017-10-08 10:06:28,259 - MainThread - Thread: Move Carousel started
+2017-10-08 10:06:28,262 - MainThread - Thread: Series Capture started
+2017-10-08 10:06:28,263 - Orient Tester - Orientation Skipped
+2017-10-08 10:06:28,263 - MainThread - Thread: Orient Tester started
+2017-10-08 10:06:28,263 - MainThread - Thread: Agitator Run started
+2017-10-08 10:06:28,265 - MainThread - Thread: Run Test started
+2017-10-08 10:06:28,267 - MainThread - Thread: Job Scheduler started
+2017-10-08 10:06:28,268 - MainThread - Thread: Diagnostics started
+2017-10-08 10:06:28,268 - MainThread - Tester Server version 0.02 loaded
+2017-10-08 10:06:28,269 - Job Scheduler - Days to run for PhHigh-API was Never
+2017-10-08 10:06:28,271 - Job Scheduler - Days to run for Ph-API was Never
+2017-10-08 10:06:28,272 - Job Scheduler - Days to run for Nitrate-API was Never
+2017-10-08 10:06:28,273 - Job Scheduler - Days to run for Ammonia-API was Never
+2017-10-08 10:06:28,274 - Job Scheduler - Days to run for Nitrite-API was Never
+2017-10-08 10:30:10,562 - MainThread - Camera Model Loaded
+2017-10-08 10:30:10,563 - MainThread - Tester Engine version 0.04 loaded
+2017-10-08 10:30:13,164 - MainThread - Thread: Video Grabber started
+2017-10-08 10:30:13,165 - MainThread - Thread: Video Streamer started
+2017-10-08 10:30:13,165 - MainThread - Thread: Capture Images started
+2017-10-08 10:30:13,167 - MainThread - Thread: Move Plunger started
+2017-10-08 10:30:13,168 - MainThread - Thread: Move Carousel started
+2017-10-08 10:30:13,169 - MainThread - Thread: Series Capture started
+2017-10-08 10:30:13,170 - Orient Tester - Orientation Skipped
+2017-10-08 10:30:13,170 - MainThread - Thread: Orient Tester started
+2017-10-08 10:30:13,172 - MainThread - Thread: Agitator Run started
+2017-10-08 10:30:13,173 - MainThread - Thread: Run Test started
+2017-10-08 10:30:13,175 - MainThread - Thread: Job Scheduler started
+2017-10-08 10:30:13,176 - MainThread - Thread: Diagnostics started
+2017-10-08 10:30:13,176 - MainThread - Tester Server version 0.02 loaded
+2017-10-08 10:30:13,177 - Job Scheduler - Days to run for Ammonia-API was Never
+2017-10-08 10:30:13,178 - Job Scheduler - Days to run for Ph-API was Never
+2017-10-08 10:30:13,180 - Job Scheduler - Days to run for TA-Taylor was Never
+2017-10-08 10:30:13,181 - Job Scheduler - Days to run for Nitrite-API was Never
+2017-10-08 10:30:13,182 - Job Scheduler - Days to run for PhHigh-API was Never
+2017-10-08 10:30:13,183 - Job Scheduler - Days to run for Nitrate-API was Never

@@ -1,4 +1,5 @@
 {% extends 'tester/base.html' %}
+{% load static %}
 
 {% block content %}
 <form action="/tester/history/" method="post" id="queueTest">
@@ -20,12 +21,18 @@ Test To View<br>
 	<input class="genericButton" type="submit" title="Display results of past tests" name="display" value="Display">
 {% endif %}
 <table class="resultsTable">
-	<tr><td>Test</td><td>Results</td><td>Status</td><td>Timestamp</td></tr><tr>
+	<tr><td>Test</td><td>Results</td><td>Status</td><td>Timestamp</td><td>Swatch</td></tr><tr>
 	{% for result in resultsList %}
 		<td title="Test that was run">{{result.testPerformed}}</td>
 		<td title="Results from the test">{{result.results}}</td>
 		<td title="Completion status">{{result.status}}</td>
 		<td title="When the test was run">{{result.datetimePerformed}}</td>
+		{% if result.swatchFile %}
+			<td title='Color Swatch'><a href="{% static 'tester/resultstrips/' %}{{result.swatchFile}}">See Color</a></td>
+		{% else %}
+			<td title='Color Swatch'>No Strip</td>
+		{% endif %}
+
 		</tr>
 	{% endfor %}
 </table>
